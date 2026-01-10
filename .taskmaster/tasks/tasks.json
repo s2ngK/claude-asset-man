@@ -9,7 +9,7 @@
         "testStrategy": "개발 서버가 정상적으로 실행되는지 확인하고, Supabase 클라이언트가 에러 없이 초기화되는지 테스트합니다.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "completed",
         "subtasks": []
       },
       {
@@ -22,7 +22,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "completed",
         "subtasks": []
       },
       {
@@ -35,7 +35,7 @@
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "status": "in_progress",
         "subtasks": [
           {
             "id": 1,
@@ -43,7 +43,7 @@
             "description": "이메일/비밀번호 방식을 사용한 로그인 및 회원가입 폼을 제작하고 Supabase Auth와 연동합니다.",
             "dependencies": [],
             "details": "Shadcn UI를 사용하여 입력 폼을 구성하고, Supabase Auth SDK의 signUp 및 signInWithPassword 메서드를 호출하는 로직을 작성합니다.",
-            "status": "pending",
+            "status": "completed",
             "testStrategy": "실제 이메일로 회원가입을 진행하고 Supabase Auth 대시보드에 사용자가 등록되는지 확인합니다."
           },
           {
@@ -54,7 +54,7 @@
               1
             ],
             "details": "Supabase SQL Editor에서 handle_new_user 함수와 on_auth_user_created 트리거를 정의하여 사용자 ID와 기본 정보를 연동합니다.",
-            "status": "pending",
+            "status": "completed",
             "testStrategy": "회원가입 직후 public.profiles 테이블에 해당 사용자의 ID를 가진 행이 자동으로 생성되었는지 SQL로 확인합니다."
           },
           {
@@ -76,7 +76,7 @@
               1
             ],
             "details": "Next.js Middleware를 사용하여 세션을 확인하고, 전역 상태 또는 Context API를 통해 사용자 정보를 애플리케이션 전체에서 공유합니다.",
-            "status": "pending",
+            "status": "completed",
             "testStrategy": "로그아웃 상태에서 보호된 페이지 접근 시 로그인 페이지로 리다이렉트되는지 확인합니다."
           }
         ]
@@ -363,7 +363,7 @@
     ],
     "metadata": {
       "created": "2026-01-09T18:23:52.339Z",
-      "updated": "2026-01-09T18:23:52.339Z",
+      "updated": "2026-01-10T17:55:00.000Z",
       "description": "Tasks for master context"
     }
   }
