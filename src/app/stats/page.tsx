@@ -14,11 +14,13 @@ export default async function StatsPage() {
     .eq('id', user.id)
     .single();
 
-  if (!profile?.group_id) {
+  if (!profile?.group_id || !profile.groups) {
     redirect('/group');
   }
 
+  const groups = profile.groups as any;
+
   return (
-    <StatsView groupName={profile.groups.name} />
+    <StatsView groupName={groups.name} />
   );
 }

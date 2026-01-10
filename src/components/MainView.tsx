@@ -181,6 +181,13 @@ export default function MainView({ groupName, inviteCode }: MainViewProps) {
     return { income, expense, balance: income - expense };
   }, [transactions]);
 
+  const handleSignOut = async () => {
+    if (confirm('로그아웃 하시겠습니까?')) {
+      await supabase.auth.signOut();
+      window.location.href = '/login';
+    }
+  };
+
   return (
     <div className="relative min-h-screen pb-24 bg-slate-50 dark:bg-slate-950">
       {/* Header with Month Selector */}
@@ -198,9 +205,14 @@ export default function MainView({ groupName, inviteCode }: MainViewProps) {
                 </div>
                 <p className="text-xs text-slate-500 font-medium">{groupName}</p>
              </div>
-             <Button variant="ghost" size="icon" className="text-slate-400">
-               <span className="material-symbols-outlined">search</span>
-             </Button>
+             <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="text-slate-400" onClick={() => alert('검색 기능은 준비 중입니다.')}>
+                  <span className="material-symbols-outlined">search</span>
+                </Button>
+                <Button variant="ghost" size="icon" className="text-slate-400" onClick={handleSignOut}>
+                  <span className="material-symbols-outlined">logout</span>
+                </Button>
+             </div>
          </div>
       </header>
 

@@ -25,14 +25,14 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initialD
 
   const handleKeyPress = (key: string) => {
     if (key === 'back') {
-      setAmountStr(prev => prev.length > 1 ? prev.slice(0, -1) : '0');
+      setAmountStr((prev: string) => prev.length > 1 ? prev.slice(0, -1) : '0');
       return;
     }
     if (key === 'C') {
       setAmountStr('0');
       return;
     }
-    setAmountStr(prev => {
+    setAmountStr((prev: string) => {
       if (prev === '0') return key === '00' ? '0' : key;
       if (prev.length > 12) return prev;
       return prev + key;

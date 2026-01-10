@@ -14,14 +14,17 @@ export default async function Home() {
     .eq('id', user.id)
     .single();
 
-  if (!profile?.group_id) {
+  if (!profile?.group_id || !profile.groups) {
     redirect('/group');
   }
 
+  // Supabase join type casting for TS
+  const groups = profile.groups as any;
+
   return (
     <MainView 
-      groupName={profile.groups.name} 
-      inviteCode={profile.groups.invite_code} 
+      groupName={groups.name} 
+      inviteCode={groups.invite_code} 
     />
   );
 }
