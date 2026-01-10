@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Household Ledger Builder",
+  "description": "A high-fidelity household account book application based on custom UI design guides, featuring expenditure analysis, group management, and a custom numeric entry system.",
+  "requestFramePermissions": []
+}
