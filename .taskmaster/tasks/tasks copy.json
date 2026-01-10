@@ -1,0 +1,140 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "프로젝트 초기 설정 및 개발 환경 구축",
+        "description": "Next.js 14+, Tailwind CSS, Shadcn UI 및 Supabase 클라이언트를 설정하여 프로젝트의 기반을 마련합니다.",
+        "details": "Next.js 14 App Router를 사용하여 프로젝트를 초기화합니다. Tailwind CSS와 Shadcn UI를 설치하고 기본 테마를 설정합니다. Supabase 프로젝트를 생성하고 환경 변수(.env)에 API 키를 설정합니다. TypeScript 타입을 정의하고 공통 컴포넌트 구조를 설계합니다.",
+        "testStrategy": "개발 서버가 정상적으로 실행되는지 확인하고, Supabase 클라이언트가 에러 없이 초기화되는지 테스트합니다.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "데이터베이스 스키마 설계 및 기초 데이터 삽입",
+        "description": "PRD에 정의된 groups, categories, profiles, transactions 테이블을 생성하고 기본 카테고리를 삽입합니다.",
+        "details": "Supabase SQL Editor를 사용하여 테이블을 생성합니다. categories 테이블에 PRD에 명시된 기본 데이터(식비, 교통, 쇼핑, 급여 등)를 SQL로 삽입합니다. Row Level Security(RLS) 정책을 설정하여 group_id 기반의 데이터 격리를 구현합니다.",
+        "testStrategy": "Supabase 대시보드에서 테이블 구조를 확인하고, SQL 쿼리를 통해 기본 카테고리가 정상적으로 조회되는지 확인합니다.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "인증 시스템 및 프로필 관리 구현",
+        "description": "Supabase Auth를 이용한 로그인/회원가입 기능과 사용자 프로필 관리 기능을 구현합니다.",
+        "details": "이메일/비밀번호 또는 소셜 로그인을 구현합니다. 사용자가 가입할 때 profiles 테이블에 자동으로 레코드가 생성되도록 Supabase Trigger를 설정하거나 API를 작성합니다. 프로필 수정 페이지를 제작합니다.",
+        "testStrategy": "회원가입 후 profiles 테이블에 데이터가 생성되는지 확인하고, 로그인 세션이 유지되는지 테스트합니다.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "그룹 생성 및 초대 코드 시스템 구현",
+        "description": "12자리 랜덤 초대 코드를 포함한 그룹 생성 및 참여 기능을 구현합니다.",
+        "details": "그룹 생성 시 영문+숫자 혼합 12자리 랜덤 코드를 생성하는 유틸리티 함수를 작성합니다. 초대 코드를 입력하여 기존 그룹에 합류하는 로직을 구현하고, 성공 시 사용자의 profile.group_id를 업데이트합니다. 초대 코드 복사 버튼을 제공합니다.",
+        "testStrategy": "그룹 생성 시 고유한 12자리 코드가 생성되는지 확인하고, 다른 계정으로 해당 코드를 입력해 그룹에 정상적으로 합류되는지 테스트합니다.",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "커스텀 숫자 키패드 및 거래 입력 UI 개발",
+        "description": "사칙연산을 지원하는 계산기 형태의 커스텀 키패드와 거래 입력 폼을 제작합니다.",
+        "details": "시스템 키보드 대신 화면 하단에 표시될 숫자 키패드 컴포넌트를 만듭니다. 금액 입력 시 실시간 사칙연산 결과를 보여줍니다. 카테고리 선택, 날짜 선택, 내용 입력 필드를 포함한 통합 UI를 구성합니다.",
+        "testStrategy": "키패드 버튼 클릭 시 숫자가 정확히 입력되는지, 사칙연산 결과가 올바른지, 모바일 뷰포트에서 레이아웃이 깨지지 않는지 확인합니다.",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Gemini API 기반 영수증 스캔 및 OCR 파싱 구현",
+        "description": "Google Gemini 1.5 Flash를 사용하여 영수증 이미지에서 데이터를 추출하고 자동 입력합니다.",
+        "details": "Supabase Storage에 이미지를 업로드한 후, 해당 URL을 Gemini API에 전달합니다. 프롬프트를 통해 금액, 항목, 날짜를 JSON 형식으로 반환받도록 설정합니다. 추출된 데이터를 입력 폼에 자동으로 채워주는 로직을 작성합니다.",
+        "testStrategy": "다양한 영수증 이미지를 업로드하여 Gemini가 금액과 항목을 정확한 JSON으로 파싱하는지, 에러 처리가 잘 되는지 테스트합니다.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "거래 내역 CRUD 및 월별 리스트 뷰 구현",
+        "description": "가계부 내역의 생성, 조회, 수정, 삭제 기능과 월별 필터링 리스트를 구현합니다.",
+        "details": "transactions 테이블에 데이터를 저장하고 불러오는 API를 작성합니다. 월별/최신순으로 정렬된 리스트 뷰를 구현합니다. 삭제 시 '삭제 취소(Undo)' 기능을 위해 Toast 메시지와 타임아웃 로직을 추가합니다.",
+        "testStrategy": "내역 추가/수정/삭제가 DB에 즉각 반영되는지 확인하고, 삭제 후 Toast의 복구 버튼을 눌렀을 때 데이터가 다시 살아나는지 테스트합니다.",
+        "priority": "high",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "통계 대시보드 및 시각화 구현 (내 통계 vs 그룹 통계)",
+        "description": "Recharts를 사용하여 개인 및 그룹별 수입/지출 통계를 시각화합니다.",
+        "details": "상단 탭 스위처를 통해 '내 통계'와 '그룹 통계' 모드를 전환합니다. 총액 요약 카드, 6개월 추이 콤보 차트, 카테고리별 도넛 차트를 구현합니다. 그룹 통계 탭에서는 구성원별 지출 랭킹 리스트를 추가합니다.",
+        "testStrategy": "탭 전환 시 데이터가 올바르게 필터링되는지 확인하고, 차트의 수치가 실제 DB 데이터 합계와 일치하는지 검증합니다.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "PWA 설정 및 모바일 최적화",
+        "description": "웹 앱을 PWA로 변환하고 모바일 사용자 경험을 최적화합니다.",
+        "details": "next-pwa 라이브러리를 사용하여 manifest.json과 서비스 워커를 설정합니다. 홈 화면 아이콘 및 스플래시 스크린을 구성합니다. `user-scalable=no` 메타 태그를 설정하고 터치 이벤트를 최적화합니다.",
+        "testStrategy": "Lighthouse를 통해 PWA 조건을 충족하는지 확인하고, 모바일 기기 브라우저에서 '홈 화면에 추가' 기능이 작동하는지 테스트합니다.",
+        "priority": "low",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "최종 폴리싱 및 Vercel 배포",
+        "description": "UI 디테일을 수정하고 Vercel을 통해 서비스를 배포합니다.",
+        "details": "전체적인 디자인 일관성을 점검하고 로딩 상태(Skeleton UI)를 추가합니다. Vercel 프로젝트를 생성하고 환경 변수를 등록하여 배포를 완료합니다. 최종적으로 보안 규칙(RLS)이 의도대로 작동하는지 점검합니다.",
+        "testStrategy": "배포된 URL에서 모든 핵심 기능(로그인, 그룹 참여, 입력, 통계)이 정상 작동하는지 최종 QA를 수행합니다.",
+        "priority": "medium",
+        "dependencies": [
+          8,
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2026-01-09T18:23:52.339Z",
+      "updated": "2026-01-09T18:23:52.339Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
