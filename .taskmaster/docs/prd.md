@@ -73,8 +73,10 @@
 2. **Custom Number Pad (Calculator)**:
    - 시스템 키보드 대체, 사칙연산 지원.
    - 구성: 금액/카테고리/날짜/내용/키패드 통합 UI.
-3. **Receipt Scan (AI)**:
-   - 이미지 최적화 -> Gemini API -> JSON 파싱 -> 자동 입력.
+3. **Receipt Scan (AI) [Updated]**:
+   - 분석 방식: 클라이언트에서 이미지를 Base64로 변환하여 Gemini API에 직접 전달 (스토리지 업로드 없이 즉시 분석).
+   - 프로세스: 이미지 선택 -> Base64 변환 -> Gemini API 분석 -> JSON 파싱 -> 입력 폼 자동 채우기.
+   - **선택적 업로드 (Future Implementation)**: 사용자가 증빙을 위해 사진을 보관하고 싶을 때만 선택적으로 Supabase Storage에 업로드하여 `image_url`을 저장. (MVP 단계에서는 OCR 분석에 집중), 이미지 용량 최적화 필요함.
 4. **CRUD**: 내역 생성/읽기/수정/삭제.
 
 ### Phase 3: Dashboard & UX

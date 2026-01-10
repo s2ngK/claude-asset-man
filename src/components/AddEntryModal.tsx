@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { TransactionType } from '@/types';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
+import { scanReceipt } from '@/services/gemini';
 
 interface AddEntryModalProps {
   onClose: () => void;
@@ -19,6 +20,8 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initialD
   const [selectedCat, setSelectedCat] = useState(initialData?.category || '식비');
   const [description, setDescription] = useState(initialData?.description || '');
   const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
+  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleKeyPress = (key: string) => {
     if (key === 'back') {
@@ -29,7 +32,6 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initialD
       setAmountStr('0');
       return;
     }
-    // 간단한 사칙연산 로직은 추후 고도화 (현재는 숫자 입력 위주)
     setAmountStr(prev => {
       if (prev === '0') return key === '00' ? '0' : key;
       if (prev.length > 12) return prev;
@@ -38,8 +40,38 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initialD
   };
 
   const handleDone = () => {
-    onSave(parseInt(amountStr.replace(/[^0-9]/g, '')), selectedCat, description, type, date);
+    onSave(parseInt(amountStr.replace(/[^0-9]/g, '') || '0'), selectedCat, description, type, date);
     onClose();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = (reader.result as string).split(',')[1];
+        const result = await scanReceipt(base64String, file.type);
+        
+        if (result) {
+          setAmountStr(result.amount.toString());
+          setSelectedCat(result.category);
+          setDescription(result.description);
+          setDate(result.date);
+          alert('영수증 분석이 완료되었습니다!');
+        } else {
+          alert('영수증 정보를 읽지 못했습니다. 다시 시도해주세요.');
+        }
+        setLoading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error(error);
+      alert('분석 중 오류가 발생했습니다.');
+      setLoading(false);
+    }
   };
 
   const formattedAmount = new Intl.NumberFormat('ko-KR').format(parseInt(amountStr.replace(/[^0-9]/g, '') || '0'));
@@ -74,6 +106,31 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initialD
             AI 영수증 스캔
           </button>
         </div>
+
+        {entryMode === 'ai' && (
+          <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-8 gap-4 bg-slate-50 dark:bg-slate-900/50">
+            <span className="material-symbols-outlined text-4xl text-indigo-500">photo_camera</span>
+            <div className="text-center">
+              <p className="font-bold text-sm">영수증 사진을 올려주세요</p>
+              <p className="text-xs text-slate-500 mt-1">AI가 금액과 내용을 자동으로 입력해줍니다.</p>
+            </div>
+            <input 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleFileChange}
+              capture="environment"
+            />
+            <Button 
+              onClick={() => fileInputRef.current?.click()} 
+              disabled={loading}
+              className="w-full max-w-[200px]"
+            >
+              {loading ? '분석 중...' : '사진 선택/촬영'}
+            </Button>
+          </div>
+        )}
 
         {/* Expense / Income Toggle */}
         <div className="flex gap-3">
