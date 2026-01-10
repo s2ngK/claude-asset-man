@@ -55,6 +55,7 @@ ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 -- Profiles: Users can only read/write their own profile
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can delete own profile" ON profiles FOR DELETE USING (auth.uid() = id);
 
 -- Groups: Users can view groups they belong to
 CREATE POLICY "Users can view their group" ON groups FOR SELECT 
@@ -63,6 +64,15 @@ USING (id IN (SELECT group_id FROM profiles WHERE id = auth.uid()));
 -- Categories: Users can view system defaults OR categories for their group
 CREATE POLICY "Users can view categories" ON categories FOR SELECT 
 USING (group_id IS NULL OR group_id IN (SELECT group_id FROM profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Users can insert group categories" ON categories FOR INSERT 
+WITH CHECK (group_id IN (SELECT group_id FROM profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Users can update group categories" ON categories FOR UPDATE
+USING (group_id IN (SELECT group_id FROM profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Users can delete group categories" ON categories FOR DELETE
+USING (group_id IN (SELECT group_id FROM profiles WHERE id = auth.uid()));
 
 -- Transactions: Users can view/modify transactions in their group
 CREATE POLICY "Users can view group transactions" ON transactions FOR SELECT 

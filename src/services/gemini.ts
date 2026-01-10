@@ -1,7 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 
 const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenAI(apiKey!);
+
+if (!apiKey) {
+  console.error("❌ Gemini API Key가 설정되지 않았습니다. .env.local 파일을 확인해주세요.");
+}
+
+const genAI = new GoogleGenAI({ apiKey: apiKey || "" });
 
 export interface OCRResult {
   amount: number;
@@ -12,8 +17,6 @@ export interface OCRResult {
 }
 
 export async function scanReceipt(base64Image: string, mimeType: string): Promise<OCRResult | null> {
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
   const prompt = `
     당신은 영수증 분석 전문가입니다. 주어진 영수증 이미지에서 다음 정보를 추출하여 반드시 JSON 형식으로만 응답하세요.
     항목은 다음과 같아야 합니다:
@@ -27,21 +30,26 @@ export async function scanReceipt(base64Image: string, mimeType: string): Promis
   `;
 
   try {
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: base64Image,
-          mimeType: mimeType
-        }
-      }
-    ]);
+    const result = await genAI.models.generateContent({
+      model: "gemini-1.5-flash",
+      config: {
+        responseMimeType: "application/json",
+      },
+      contents: [
+        { text: prompt },
+        {
+          inlineData: {
+            data: base64Image,
+            mimeType: mimeType,
+          },
+        },
+      ],
+    });
 
-    const response = await result.response;
-    const text = response.text();
+    const text = result.text;
     
     // JSON 문자열만 추출 (간혹 마크다운 형식이 섞일 수 있음)
-    const jsonMatch = text.match(/\{.*\}/s);
+    const jsonMatch = text?.match(/\{.*\}/s);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]) as OCRResult;
     }

@@ -50,10 +50,9 @@ export default function MainView({ groupName, inviteCode }: MainViewProps) {
       .from('transactions')
       .select(`
         *,
-        categories (id, name, icon, color),
-        profiles (full_name, avatar_url)
+        categories (id, name, icon, color)
       `)
-      .eq('group_id', profile.group_id)
+      .eq('user_id', user.id)
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: false })

@@ -60,16 +60,16 @@
 
 ### Phase 1: Authentication & Onboarding
 1. **User Sign Up/In**: Supabase Auth.
-2. **Group Connection (Security Enhanced)**:
-   - 그룹 생성 시 **12자리 랜덤 코드(영문+숫자 혼합)** 생성.
-   - 예: `A1b2C3d4E5f6` (충돌 방지 및 무단 접근 차단).
-   - 그룹 합류 시 해당 12자리 코드 정확히 입력 필요.
-3.**기초 데이터 입력**: categories 테이블을 생성한 후, 아래와 같은 SQL로 기본 데이터를 넣어주세요.
-   - Expense: 식비(🍔), 교통(🚌), 쇼핑(🛍️), 주거/통신(🏠), 의료/건강(💊)
-   - Income: 급여(💰), 용돈(💵), 금융수입(📈), 기타(🎸)
-
+2. **Account Management [New]**:
+   - **User Withdrawal**: 사용자가 탈퇴 시 `profiles` 및 해당 사용자가 작성한 `transactions` 데이터 처리 (Cascade 삭제 또는 익명화).
+3. **Group Connection (Security Enhanced)**:
+...
 ### Phase 2: Transaction Management (Input & Edit)
 1. **Input Type Selection**: '직접 입력' vs '영수증 스캔'.
+2. **Category Management [New]**:
+   - 그룹 멤버는 본인 그룹 전용 카테고리를 추가/수정/삭제 가능.
+   - 시스템 기본 카테고리는 수정 불가능, 조회만 가능.
+...
 2. **Custom Number Pad (Calculator)**:
    - 시스템 키보드 대체, 사칙연산 지원.
    - 구성: 금액/카테고리/날짜/내용/키패드 통합 UI.

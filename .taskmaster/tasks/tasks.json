@@ -9,7 +9,7 @@
         "testStrategy": "개발 서버가 정상적으로 실행되는지 확인하고, Supabase 클라이언트가 에러 없이 초기화되는지 테스트합니다.",
         "priority": "high",
         "dependencies": [],
-        "status": "completed",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -22,7 +22,7 @@
         "dependencies": [
           1
         ],
-        "status": "completed",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -35,7 +35,7 @@
         "dependencies": [
           2
         ],
-        "status": "completed",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -43,7 +43,7 @@
             "description": "이메일/비밀번호 방식을 사용한 로그인 및 회원가입 폼을 제작하고 Supabase Auth와 연동합니다.",
             "dependencies": [],
             "details": "Shadcn UI를 사용하여 입력 폼을 구성하고, Supabase Auth SDK의 signUp 및 signInWithPassword 메서드를 호출하는 로직을 작성합니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "실제 이메일로 회원가입을 진행하고 Supabase Auth 대시보드에 사용자가 등록되는지 확인합니다."
           },
           {
@@ -54,7 +54,7 @@
               1
             ],
             "details": "Supabase SQL Editor에서 handle_new_user 함수와 on_auth_user_created 트리거를 정의하여 사용자 ID와 기본 정보를 연동합니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "회원가입 직후 public.profiles 테이블에 해당 사용자의 ID를 가진 행이 자동으로 생성되었는지 SQL로 확인합니다."
           },
           {
@@ -76,7 +76,7 @@
               1
             ],
             "details": "Next.js Middleware를 사용하여 세션을 확인하고, 전역 상태 또는 Context API를 통해 사용자 정보를 애플리케이션 전체에서 공유합니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "로그아웃 상태에서 보호된 페이지 접근 시 로그인 페이지로 리다이렉트되는지 확인합니다."
           }
         ]
@@ -91,7 +91,7 @@
         "dependencies": [
           3
         ],
-        "status": "completed",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -104,7 +104,7 @@
         "dependencies": [
           4
         ],
-        "status": "completed",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -112,7 +112,7 @@
             "description": "0-9 숫자와 사칙연산 기호가 포함된 그리드 형태의 키패드 UI를 제작합니다.",
             "dependencies": [],
             "details": "Tailwind CSS를 사용하여 4x4 그리드 레이아웃을 구성하고, 각 버튼의 클릭 피드백(Active 상태)을 구현합니다. Shadcn UI의 Button 컴포넌트를 활용하여 일관된 디자인을 유지합니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "각 버튼이 화면에 올바르게 렌더링되는지 확인하고 클릭 이벤트가 정상적으로 발생하는지 테스트합니다."
           },
           {
@@ -123,7 +123,7 @@
               1
             ],
             "details": "문자열 기반의 수식 파싱 로직을 구현하여 실시간으로 계산 결과를 업데이트합니다. 소수점 처리, 연속 연산자 입력 방지 및 삭제(Backspacing) 기능을 포함합니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "복합적인 사칙연산 수식을 입력했을 때 정확한 결과값이 산출되는지 단위 테스트를 수행합니다."
           },
           {
@@ -132,7 +132,7 @@
             "description": "카테고리 선택, 날짜 선택, 메모 입력을 위한 통합 폼을 개발합니다.",
             "dependencies": [],
             "details": "Shadcn UI의 Popover와 Calendar를 사용하여 날짜 선택기를 구현하고, 카테고리 선택을 위한 Select 컴포넌트를 배치합니다. 전체적인 폼의 유효성 검사 로직을 추가합니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "모든 입력 필드가 정상적으로 작동하며, 필수 값이 누락되었을 때 유효성 검사가 작동하는지 확인합니다."
           },
           {
@@ -145,7 +145,7 @@
               3
             ],
             "details": "금액 입력 필드 포커스 시 시스템 키보드 대신 커스텀 키패드가 하단에 표시되도록 구현합니다. 모바일 뷰포트(vh) 대응 및 터치 영역 최적화를 진행합니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "실제 모바일 기기 환경에서 키패드가 하단에 고정되는지, 입력 흐름이 자연스러운지 최종 QA를 수행합니다."
           }
         ]
@@ -160,7 +160,7 @@
         "dependencies": [
           5
         ],
-        "status": "completed",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -179,7 +179,7 @@
               1
             ],
             "details": "Google AI Studio에서 API 키를 발급받아 환경 변수에 설정합니다. 업로드된 이미지 URL을 Gemini 1.5 Flash 모델에 전달하며, 금액(amount), 항목(items), 날짜(date)를 특정 JSON 구조로 응답하도록 시스템 프롬프트를 설계합니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "API 호출 시 Gemini로부터 영수증 내용이 포함된 텍스트 응답이 정상적으로 수신되는지 확인합니다."
           },
           {
@@ -190,7 +190,7 @@
               2
             ],
             "details": "정규표현식 또는 JSON.parse를 사용하여 응답 텍스트에서 JSON 블록을 추출합니다. 추출된 데이터가 유효한 날짜 형식인지, 금액이 숫자인지 Zod 스키마를 사용하여 런타임 유효성 검사를 수행합니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "다양한 영수증 응답 케이스에 대해 JSON 파싱이 실패 없이 이루어지는지 단위 테스트를 수행합니다."
           },
           {
@@ -201,7 +201,7 @@
               3
             ],
             "details": "React Hook Form의 setValue 함수를 사용하여 OCR 결과로 얻은 금액, 날짜, 카테고리 필드를 자동으로 업데이트합니다. 사용자가 자동 입력된 내용을 확인하고 수정할 수 있도록 UI 피드백을 제공합니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "OCR 프로세스 완료 후 화면의 입력 필드들이 자동으로 채워지고 사용자가 수정 가능한지 확인합니다."
           },
           {
@@ -215,7 +215,7 @@
               4
             ],
             "details": "각 단계별로 try-catch 문을 적용하고 사용자에게 적절한 에러 메시지를 Toast UI로 표시합니다. 저화질 이미지나 지원하지 않는 파일 형식에 대한 사전 검증 로직을 추가하여 시스템 안정성을 높입니다.",
-            "status": "completed",
+            "status": "done",
             "testStrategy": "잘못된 파일 업로드나 네트워크 차단 상황을 시뮬레이션하여 에러 메시지가 정상적으로 출력되는지 확인합니다."
           }
         ]
@@ -230,7 +230,7 @@
         "dependencies": [
           5
         ],
-        "status": "in_progress",
+        "status": "in-progress",
         "subtasks": [
           {
             "id": 1,
@@ -238,7 +238,7 @@
             "description": "Supabase 클라이언트를 사용하여 transactions 테이블에 대한 생성, 조회, 수정, 삭제 함수를 작성합니다.",
             "dependencies": [],
             "details": "insert, select, update, delete 쿼리를 작성하고, TypeScript 인터페이스를 정의하여 데이터 타입을 보장합니다. RLS 정책이 적용된 상태에서 group_id 필터링을 포함합니다.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Postman 또는 Supabase 대시보드를 통해 CRUD 작업 후 데이터베이스 반영 여부를 확인합니다."
           },
           {
@@ -249,7 +249,7 @@
               1
             ],
             "details": "Shadcn UI의 Select 또는 Date Picker를 사용하여 월 선택 기능을 구현하고, 선택된 날짜 범위에 따라 데이터를 필터링하여 렌더링합니다.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "월별 필터 변경 시 해당 월의 데이터만 정확히 표시되는지, 날짜 역순으로 정렬되는지 확인합니다."
           },
           {
@@ -260,7 +260,7 @@
               1
             ],
             "details": "React Hook Form과 Zod를 사용하여 유효성 검사를 수행합니다. 금액, 카테고리, 날짜, 메모 입력을 지원하며 Shadcn UI 컴포넌트를 활용합니다.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "필수 입력값 누락 시 에러 메시지가 출력되는지, 저장 시 리스트가 즉시 업데이트되는지 확인합니다."
           },
           {
@@ -272,7 +272,7 @@
               2
             ],
             "details": "삭제 버튼 클릭 시 상태를 '삭제 대기'로 변경하고 Toast 메시지를 띄웁니다. 5초 내에 '취소'를 누르면 상태를 복구하고, 시간이 만료되면 실제 DB 삭제를 실행합니다.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "삭제 후 Toast의 '취소' 버튼을 눌렀을 때 데이터가 유지되는지, 타임아웃 후 DB에서 실제로 삭제되는지 확인합니다."
           }
         ]
