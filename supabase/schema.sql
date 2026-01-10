@@ -88,3 +88,19 @@ INSERT INTO categories (type, name, icon, color, is_default) VALUES
 ('income', '용돈', '💵', '#75FF33', true),
 ('income', '금융수입', '📈', '#DB33FF', true),
 ('income', '기타', '🎸', '#808080', true);
+
+-- 7. Automated Profile Creation (Trigger)
+-- Function to insert a row into public.profiles
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, avatar_url)
+  VALUES (new.id, new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'avatar_url');
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to call the function on new user creation
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
