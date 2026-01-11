@@ -34,15 +34,6 @@ export default function MainView({ groupName, inviteCode }: MainViewProps) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Get current user's group_id first (optimization: pass from props if possible, but safe here)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('group_id')
-      .eq('id', user.id)
-      .single();
-    
-    if (!profile?.group_id) return;
-
     const startDate = `${currentMonth}-01`;
     const endDate = `${currentMonth}-31`; // Simple approximation
 
@@ -50,7 +41,8 @@ export default function MainView({ groupName, inviteCode }: MainViewProps) {
       .from('transactions')
       .select(`
         *,
-        categories (id, name, icon, color)
+        categories (id, name, icon, color),
+        profiles (full_name, avatar_url)
       `)
       .eq('user_id', user.id)
       .gte('date', startDate)
@@ -80,18 +72,14 @@ export default function MainView({ groupName, inviteCode }: MainViewProps) {
       if (!profile?.group_id) throw new Error('No group');
 
       // Find Category ID by Name
-      // First, try to find in DEFAULT_CATEGORIES to match the UI
       const defaultCat = DEFAULT_CATEGORIES.find(c => c.name === categoryName);
       
-      // We need real DB category ID. 
-      // Strategy: Look up in 'categories' table. If not found, use a fallback or error.
-      // For MVP, we assume categories are already seeded as per Schema.
       let { data: catData } = await supabase
         .from('categories')
         .select('id')
         .eq('name', categoryName)
         .eq('type', type) // Ensure type matches
-        .maybeSingle(); // Use maybeSingle to avoid error if not found immediately
+        .maybeSingle(); 
 
       if (!catData) {
          // Fallback: Query without type if name is unique enough, or just pick first
@@ -142,7 +130,6 @@ export default function MainView({ groupName, inviteCode }: MainViewProps) {
       const { error } = await supabase.from('transactions').delete().eq('id', id);
       if (error) {
         console.error('Delete failed:', error);
-        // Rollback UI if failed (optional, complicated)
         alert('삭제 중 오류가 발생했습니다.');
         fetchTransactions(); 
       }
@@ -181,12 +168,9 @@ export default function MainView({ groupName, inviteCode }: MainViewProps) {
     return { income, expense, balance: income - expense };
   }, [transactions]);
 
-  const handleSignOut = async () => {
-    if (confirm('로그아웃 하시겠습니까?')) {
-      await supabase.auth.signOut();
-      window.location.href = '/login';
-    }
-  };
+  // 로그아웃은 SettingsView로 이동했으므로 여기서는 제거하거나 간단히 유지
+  // 기획 변경: 헤더의 '설정(톱니바퀴)' 버튼이 SettingsView로 이동하므로 여기서 직접 로그아웃 할 필요 없음.
+  // 대신 검색 버튼과 설정 버튼만 남깁니다.
 
   return (
     <div className="relative min-h-screen pb-24 bg-slate-50 dark:bg-slate-950">
@@ -209,9 +193,11 @@ export default function MainView({ groupName, inviteCode }: MainViewProps) {
                 <Button variant="ghost" size="icon" className="text-slate-400" onClick={() => alert('검색 기능은 준비 중입니다.')}>
                   <span className="material-symbols-outlined">search</span>
                 </Button>
-                <Button variant="ghost" size="icon" className="text-slate-400" onClick={handleSignOut}>
-                  <span className="material-symbols-outlined">logout</span>
-                </Button>
+                <Link href="/settings">
+                  <Button variant="ghost" size="icon" className="text-slate-400">
+                    <span className="material-symbols-outlined">settings</span>
+                  </Button>
+                </Link>
              </div>
          </div>
       </header>
