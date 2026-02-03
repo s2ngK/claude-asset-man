@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { StyleSheet, View, Text, FlatList, Pressable, ActivityIndicator, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { supabase } from '../../src/lib/supabaseClient';
-import { Transaction, TransactionType } from '../../src/types';
-import { Plus, Search, Settings, Home, BarChart2 } from 'lucide-react-native';
 import { format } from 'date-fns';
+import { useRouter } from 'expo-router';
+import { Plus, Search, Settings } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { supabase } from '../../src/lib/supabaseClient';
+import { Transaction } from '../../src/types';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -101,7 +101,7 @@ export default function HomeScreen() {
           <Pressable style={styles.iconButton}>
             <Search size={24} color="#94a3b8" />
           </Pressable>
-          <Pressable style={styles.iconButton} onPress={() => router.push('/settings')}>
+          <Pressable style={styles.iconButton} onPress={() => router.push('//settings')}>
             <Settings size={24} color="#94a3b8" />
           </Pressable>
         </View>
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 60,
     paddingHorizontal: 20,
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   },
   monthText: {
     fontSize: 20,
-    fontBold: 'bold',
+    fontWeight: 'bold',
     color: '#0f172a',
   },
   groupText: {
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: 'row',
-    justifyContent: 'between',
+    justifyContent: 'space-between',
   },
   rowLabel: {
     fontSize: 10,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   },
   dateHeader: {
     flexDirection: 'row',
-    justifyContent: 'between',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 10,
     backgroundColor: '#f8fafc',
