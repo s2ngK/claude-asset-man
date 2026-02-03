@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, Pressable, TextInput, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
-import { useRouter } from 'expo-router';
-import { supabase } from '../src/lib/supabaseClient';
-import { scanReceipt } from '../src/services/gemini';
-import { Camera, ChevronDown, X, Backspace, CheckCircle2 } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import { Camera, CheckCircle2, ChevronDown, Delete, X } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { supabase } from '../src/lib/supabaseClient';
+import { scanReceipt } from '../src/services/gemini';
 import { TransactionType } from '../src/types';
 
 const DEFAULT_CATEGORIES = [
@@ -216,14 +216,17 @@ export default function AddEntryScreen() {
         </View>
 
         {showDatePicker && (
-          <DateTimePicker
-            value={date}
-            mode="date"
-            onChange={(event, selectedDate) => {
-              setShowDatePicker(false);
-              if (selectedDate) setDate(selectedDate);
-            }}
-          />
+          Platform.OS === 'ios' || Platform.OS === 'android' ? (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, selectedDate) => {
+                setShowDatePicker(false);
+                if (selectedDate) setDate(selectedDate);
+              }}
+            />
+          ) : null
         )}
       </ScrollView>
 
@@ -239,7 +242,7 @@ export default function AddEntryScreen() {
           <KeyButton label="4" onPress={handleKeyPress} />
           <KeyButton label="5" onPress={handleKeyPress} />
           <KeyButton label="6" onPress={handleKeyPress} />
-          <KeyButton label="back" onPress={handleKeyPress} variant="action" icon={<Backspace size={20} color="#6366f1" />} />
+          <KeyButton label="back" onPress={handleKeyPress} variant="action" icon={<Delete size={20} color="#6366f1" />} />
         </View>
         <View style={styles.keypadRow}>
           <KeyButton label="1" onPress={handleKeyPress} />

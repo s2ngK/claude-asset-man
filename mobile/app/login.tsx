@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, Pressable, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { supabase } from '../src/lib/supabaseClient';
 
 export default function LoginScreen() {
@@ -35,7 +35,7 @@ export default function LoginScreen() {
         });
         if (error) throw error;
         // 로그인 성공 시 홈으로 이동
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/home');
       }
     } catch (error: any) {
       Alert.alert('오류', error.message);

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { supabase } from '../src/lib/supabaseClient';
-import { User, ArrowLeft, Copy, LogOut, UserMinus, User as UserIcon } from 'lucide-react-native';
+import { supabase } from '@/src/lib/supabaseClient';
 import * as Clipboard from 'expo-clipboard';
+import { useRouter } from 'expo-router';
+import { ArrowLeft, Copy, LogOut, User as UserIcon, UserMinus } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -70,7 +70,7 @@ export default function SettingsScreen() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     // In Expo Router, replacing with root or login
-    router.replace('/(tabs)' as any); 
+    router.replace('/login'); 
   };
 
   const handleDeleteAccount = async () => {
@@ -90,7 +90,7 @@ export default function SettingsScreen() {
               setUpdating(false);
             } else {
               await supabase.auth.signOut();
-              router.replace('/(tabs)' as any);
+              router.replace('/login');
             }
           }
         }

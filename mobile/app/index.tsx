@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
+import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { supabase } from '../src/lib/supabaseClient';
 
 export default function Index() {
@@ -10,7 +10,7 @@ export default function Index() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/home');
       } else {
         router.replace('/login');
       }
@@ -18,7 +18,7 @@ export default function Index() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/home');
       } else {
         router.replace('/login');
       }

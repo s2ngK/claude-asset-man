@@ -101,7 +101,7 @@ export default function HomeScreen() {
           <Pressable style={styles.iconButton}>
             <Search size={24} color="#94a3b8" />
           </Pressable>
-          <Pressable style={styles.iconButton} onPress={() => router.push('//settings')}>
+          <Pressable style={styles.iconButton} onPress={() => router.push('/settings')}>
             <Settings size={24} color="#94a3b8" />
           </Pressable>
         </View>
