@@ -146,7 +146,7 @@ export default function HomeScreen() {
       {/* FAB */}
       <Pressable 
         style={styles.fab}
-        onPress={() => Alert.alert('준비 중', '내역 추가 기능은 곧 구현됩니다.')}
+        onPress={() => router.push('/add-entry')}
       >
         <Plus size={32} color="white" />
       </Pressable>
