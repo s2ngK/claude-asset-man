@@ -1,105 +1,94 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { supabase } from '../../src/lib/supabaseClient';
-import { Transaction } from '../../src/types';
-import { format, subMonths, startOfMonth } from 'date-fns';
-import { BarChart3, PieChart as PieChartIcon, Users, User } from 'lucide-react-native';
+import { format, endOfMonth, parse } from 'date-fns';
+import { Users, User } from 'lucide-react-native';
+
+interface CategoryStat {
+  category_name: string;
+  category_color: string;
+  category_icon: string;
+  total_amount: number;
+}
+
+interface MemberStat {
+  user_id: string;
+  full_name: string;
+  total_amount: number;
+  percent?: number;
+}
 
 export default function StatsScreen() {
   const [activeTab, setActiveTab] = useState<'my' | 'group'>('my');
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  const [categoryData, setCategoryData] = useState<CategoryStat[]>([]);
+  const [memberRanking, setMemberRanking] = useState<MemberStat[]>([]);
+  const [totalExpense, setTotalExpense] = useState(0);
 
   const fetchStatsData = useCallback(async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      setCurrentUserId(user.id);
 
       const { data: profile } = await supabase.from('profiles').select('group_id').eq('id', user.id).single();
       if (!profile?.group_id) return;
 
-      const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
-      const startDate = format(sixMonthsAgo, 'yyyy-MM-dd');
+      // Calculate dates for the selected month
+      const monthDate = parse(currentMonth, 'yyyy-MM', new Date());
+      const startDate = format(monthDate, 'yyyy-MM-dd');
+      const endDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
 
-      const { data, error } = await supabase
-        .from('transactions')
-        .select(`
-          *,
-          categories (name, icon, color),
-          profiles (full_name)
-        `)
-        .eq('group_id', profile.group_id)
-        .gte('date', startDate)
-        .order('date', { ascending: true });
+      const userIdParam = activeTab === 'my' ? user.id : null;
 
-      if (error) throw error;
-      setTransactions(data as any[]);
+      // 1. Fetch Category Stats
+      const { data: catStats, error: catError } = await supabase.rpc('get_monthly_category_stats', {
+        _group_id: profile.group_id,
+        _month_start: startDate,
+        _month_end: endDate,
+        _user_id: userIdParam
+      });
+
+      if (catError) throw catError;
+      setCategoryData(catStats || []);
+      
+      const total = (catStats || []).reduce((acc: number, curr: CategoryStat) => acc + curr.total_amount, 0);
+      setTotalExpense(total);
+
+      // 2. Fetch Member Stats (Only for Group tab)
+      if (activeTab === 'group') {
+        const { data: memStats, error: memError } = await supabase.rpc('get_monthly_member_stats', {
+          _group_id: profile.group_id,
+          _month_start: startDate,
+          _month_end: endDate
+        });
+
+        if (memError) throw memError;
+        
+        // Calculate percentages
+        const grandTotal = (memStats || []).reduce((acc: number, curr: MemberStat) => acc + curr.total_amount, 0);
+        const rankingWithPercent = (memStats || []).map((m: MemberStat) => ({
+          ...m,
+          percent: grandTotal > 0 ? Math.round((m.total_amount / grandTotal) * 100) : 0
+        }));
+        
+        setMemberRanking(rankingWithPercent);
+      } else {
+        setMemberRanking([]);
+      }
+
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentMonth, activeTab]);
 
   useEffect(() => {
     fetchStatsData();
   }, [fetchStatsData]);
-
-  const filteredByTab = useMemo(() => {
-    if (activeTab === 'my') {
-      return transactions.filter(t => t.user_id === currentUserId);
-    }
-    return transactions;
-  }, [transactions, activeTab, currentUserId]);
-
-  const categoryData = useMemo(() => {
-    const currentMonthTxs = filteredByTab.filter(t => t.date.startsWith(currentMonth) && t.type === 'expense');
-    const aggregation: { [key: string]: { amount: number, color: string, icon: string } } = {};
-    
-    currentMonthTxs.forEach(t => {
-      const name = (t as any).categories?.name || '기타';
-      if (!aggregation[name]) {
-        aggregation[name] = { 
-          amount: 0, 
-          color: (t as any).categories?.color || '#94a3b8',
-          icon: (t as any).categories?.icon || '💰'
-        };
-      }
-      aggregation[name].amount += t.amount;
-    });
-
-    return Object.entries(aggregation)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.amount - a.amount);
-  }, [filteredByTab, currentMonth]);
-
-  const totalExpense = categoryData.reduce((acc, curr) => acc + curr.amount, 0);
-
-  const memberRanking = useMemo(() => {
-    if (activeTab !== 'group') return [];
-    const currentMonthTxs = transactions.filter(t => t.date.startsWith(currentMonth) && t.type === 'expense');
-    const aggregation: { [key: string]: { name: string, amount: number } } = {};
-
-    currentMonthTxs.forEach(t => {
-      const uid = t.user_id;
-      const name = (t as any).profiles?.full_name || '알 수 없음';
-      if (!aggregation[uid]) aggregation[uid] = { name, amount: 0 };
-      aggregation[uid].amount += t.amount;
-    });
-
-    const total = Object.values(aggregation).reduce((acc, curr) => acc + curr.amount, 0);
-
-    return Object.values(aggregation)
-      .map(m => ({
-        ...m,
-        percent: total > 0 ? Math.round((m.amount / total) * 100) : 0
-      }))
-      .sort((a, b) => b.amount - a.amount);
-  }, [transactions, currentMonth, activeTab]);
 
   return (
     <View style={styles.container}>
@@ -138,22 +127,26 @@ export default function StatsScreen() {
               </Text>
               
               <View style={styles.categoryList}>
-                {categoryData.map((item, index) => (
-                  <View key={item.name} style={styles.categoryItem}>
-                    <View style={styles.categoryInfo}>
-                      <View style={[styles.colorDot, { backgroundColor: item.color }]} />
-                      <Text style={styles.categoryName}>{item.icon} {item.name}</Text>
+                {categoryData.length === 0 ? (
+                  <Text style={{color: '#94a3b8', textAlign: 'center', marginVertical: 20}}>지출 내역이 없습니다.</Text>
+                ) : (
+                  categoryData.map((item, index) => (
+                    <View key={index} style={styles.categoryItem}>
+                      <View style={styles.categoryInfo}>
+                        <View style={[styles.colorDot, { backgroundColor: item.category_color || '#94a3b8' }]} />
+                        <Text style={styles.categoryName}>{item.category_icon} {item.category_name}</Text>
+                      </View>
+                      <View style={styles.categoryValue}>
+                        <Text style={styles.categoryAmount}>
+                          {new Intl.NumberFormat('ko-KR').format(item.total_amount)}원
+                        </Text>
+                        <Text style={styles.categoryPercent}>
+                          {totalExpense > 0 ? Math.round((item.total_amount / totalExpense) * 100) : 0}%
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.categoryValue}>
-                      <Text style={styles.categoryAmount}>
-                        {new Intl.NumberFormat('ko-KR').format(item.amount)}원
-                      </Text>
-                      <Text style={styles.categoryPercent}>
-                        {totalExpense > 0 ? Math.round((item.amount / totalExpense) * 100) : 0}%
-                      </Text>
-                    </View>
-                  </View>
-                ))}
+                  ))
+                )}
               </View>
             </View>
 
@@ -161,11 +154,11 @@ export default function StatsScreen() {
             {activeTab === 'group' && memberRanking.length > 0 && (
               <View style={{ gap: 12 }}>
                 <Text style={styles.sectionTitle}>구성원별 지출</Text>
-                {memberRanking.map(member => (
-                  <View key={member.name} style={styles.rankingCard}>
+                {memberRanking.map((member, index) => (
+                  <View key={index} style={styles.rankingCard}>
                     <View style={styles.rankingHeader}>
-                      <Text style={styles.memberName}>{member.name}</Text>
-                      <Text style={styles.memberAmount}>{new Intl.NumberFormat('ko-KR').format(member.amount)}원</Text>
+                      <Text style={styles.memberName}>{member.full_name || '알 수 없음'}</Text>
+                      <Text style={styles.memberAmount}>{new Intl.NumberFormat('ko-KR').format(member.total_amount)}원</Text>
                     </View>
                     <View style={styles.progressBarBg}>
                       <View style={[styles.progressBarFill, { width: `${member.percent}%` }]} />

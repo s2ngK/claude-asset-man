@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, endOfMonth, parse } from 'date-fns';
 import { useRouter } from 'expo-router';
 import { Plus, Search, Settings } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -12,6 +12,7 @@ export default function HomeScreen() {
   const [currentMonth, setCurrentMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [loading, setLoading] = useState(false);
   const [groupName, setGroupName] = useState('My Group');
+  const [summary, setSummary] = useState({ income: 0, expense: 0, balance: 0 });
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -20,14 +21,26 @@ export default function HomeScreen() {
       if (!user) return;
 
       const startDate = `${currentMonth}-01`;
-      const endDate = `${currentMonth}-31`;
+      const monthDate = parse(currentMonth, 'yyyy-MM', new Date());
+      const endDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
 
+      // 1. Fetch Summary from RPC
+      const { data: summaryData, error: summaryError } = await supabase.rpc('get_monthly_summary', {
+        _user_id: user.id,
+        _month_start: startDate,
+        _month_end: endDate
+      });
+
+      if (!summaryError && summaryData && summaryData.length > 0) {
+        setSummary(summaryData[0]);
+      }
+
+      // 2. Fetch Transactions List
       const { data, error } = await supabase
         .from('transactions')
         .select(`
           *,
-          categories (id, name, icon, color),
-          profiles (full_name, avatar_url)
+          categories (id, name, icon, color)
         `)
         .eq('user_id', user.id)
         .gte('date', startDate)
@@ -36,7 +49,7 @@ export default function HomeScreen() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTransactions(data as any[]);
+      setTransactions(data as Transaction[]);
     } catch (error) {
       console.error('Error fetching transactions:', error);
     } finally {
@@ -47,12 +60,6 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
-
-  const summary = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-    const expense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
-    return { income, expense, balance: income - expense };
-  }, [transactions]);
 
   const groupedTransactions = useMemo(() => {
     const groups: { [date: string]: Transaction[] } = {};
@@ -127,7 +134,7 @@ export default function HomeScreen() {
       </View>
 
       {/* List */}
-      {loading ? (
+      {loading && transactions.length === 0 ? (
         <ActivityIndicator style={{ marginTop: 40 }} color="#10b981" />
       ) : (
         <FlatList
@@ -136,9 +143,11 @@ export default function HomeScreen() {
           keyExtractor={item => item[0]}
           contentContainerStyle={{ paddingBottom: 100 }}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>아직 내역이 없습니다.</Text>
-            </View>
+            !loading ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>아직 내역이 없습니다.</Text>
+              </View>
+            ) : null
           }
         />
       )}
