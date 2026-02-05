@@ -10,6 +10,7 @@ if (!apiKey) {
   console.warn("❌ Gemini API Key가 설정되지 않았습니다. 환경 변수를 확인해주세요.");
 }
 
+// @google/genai 최신 SDK 사용
 const ai = new GoogleGenAI({ apiKey });
 
 export interface OCRResult {
@@ -18,6 +19,27 @@ export interface OCRResult {
   description: string;
   date: string;
   type: "expense" | "income";
+}
+
+// 공통 파싱 로직
+function parseGeminiResponse(text: string): OCRResult | null {
+  try {
+    // 마크다운 코드 블록(```json ... ```) 제거
+    const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(cleanedText) as OCRResult;
+  } catch (e) {
+    console.error("JSON Parse Error:", e);
+    // 혹시 JSON 포맷이 꼬였을 경우를 대비해 정규식으로 추출 시도
+    const jsonMatch = text.match(/\{.*\}/s);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]) as OCRResult;
+      } catch (e2) {
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 export async function scanReceipt(
@@ -53,15 +75,55 @@ export async function scanReceipt(
           ],
         },
       ],
+      config: {
+        responseMimeType: "application/json",
+      },
     });
 
-    const text = result.text || "";
-    if (!text) return null;
-
-    // responseMimeType을 JSON으로 강제했기 때문에 보통 바로 JSON 문자열이 옵니다.
-    return JSON.parse(text) as OCRResult;
+    return parseGeminiResponse(result.text || "");
   } catch (error) {
     console.error("Gemini OCR failed:", error);
+    throw error;
+  }
+}
+
+export async function parseTransactionText(
+  inputText: string
+): Promise<OCRResult | null> {
+  const prompt = `
+당신은 금융 텍스트 분석 전문가입니다. 아래의 카드 사용 문자나 금융 메시지를 분석하여 핵심 정보를 추출하고 JSON 형식으로 응답하세요.
+
+[분석할 텍스트]:
+${inputText}
+
+[요구사항]:
+1. amount: 결제 금액 (숫자만, 쉼표 제외)
+2. category: 식비, 교통, 쇼핑, 주거/통신, 의료/건강, 기타 중 가장 적절한 것 선택.
+3. description: 사용처 (가맹점명)
+4. date: 결제 일시 (YYYY-MM-DD 형식). 연도가 없으면 2026년으로 가정.
+5. type: 지출이면 'expense', 입금/취소면 'income' (취소는 income으로 처리하거나 마이너스 expense로 처리할 수 있으나 여기선 문맥에 맞게 판단, 보통 결제 문자는 'expense')
+
+[응답 예시]:
+{"amount":25000,"category":"식비","description":"BBQ치킨","date":"2026-02-03","type":"expense"}
+  `.trim();
+
+  try {
+    const result = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+      config: {
+        responseMimeType: "application/json",
+      },
+    });
+
+    return parseGeminiResponse(result.text || "");
+  } catch (error) {
+    console.error("Gemini Text Parse failed:", error);
     throw error;
   }
 }

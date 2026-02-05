@@ -1,34 +1,62 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { format } from 'date-fns';
-import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { Camera, CheckCircle2, ChevronDown, Delete, X } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, Pressable, TextInput, ScrollView, ActivityIndicator, Alert, Modal, Platform, KeyboardAvoidingView } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../src/lib/supabaseClient';
-import { scanReceipt } from '../src/services/gemini';
+import { scanReceipt, parseTransactionText } from '../src/services/gemini';
+import { Camera, ChevronDown, X, Delete, CheckCircle2, FileText, Wand2 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { format, parseISO } from 'date-fns';
 import { TransactionType } from '../src/types';
 
-const DEFAULT_CATEGORIES = [
-  { id: '1', name: '식비', icon: '🍔' },
-  { id: '2', name: '교통', icon: '🚌' },
-  { id: '3', name: '쇼핑', icon: '🛍️' },
-  { id: '4', name: '주거/통신', icon: '🏠' },
-  { id: '5', name: '의료/건강', icon: '🏥' },
-  { id: '6', name: '기타', icon: '💰' },
+const CATEGORIES = [
+  { id: '1', name: '식비', icon: '🍔', type: 'expense' },
+  { id: '2', name: '교통', icon: '🚌', type: 'expense' },
+  { id: '3', name: '쇼핑', icon: '🛍️', type: 'expense' },
+  { id: '4', name: '주거/통신', icon: '🏠', type: 'expense' },
+  { id: '5', name: '의료/건강', icon: '🏥', type: 'expense' },
+  { id: '6', name: '기타', icon: '💰', type: 'expense' },
+  { id: '7', name: '급여', icon: '💸', type: 'income' },
+  { id: '8', name: '용돈', icon: '💵', type: 'income' },
+  { id: '9', name: '금융수입', icon: '📈', type: 'income' },
+  { id: '10', name: '기타', icon: '💰', type: 'income' },
 ];
 
 export default function AddEntryScreen() {
   const router = useRouter();
-  const [entryMode, setEntryMode] = useState<'direct' | 'ai'>('direct');
-  const [type, setType] = useState<TransactionType>('expense');
-  const [amountStr, setAmountStr] = useState('0');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('식비');
-  const [date, setDate] = useState(new Date());
+  const params = useLocalSearchParams();
+  const isEdit = !!params.id;
+
+  const [entryMode, setEntryMode] = useState<'direct' | 'ai' | 'text'>('direct');
+  const [type, setType] = useState<TransactionType>((params.type as TransactionType) || 'expense');
+  const [amountStr, setAmountStr] = useState((params.amount as string) || '0');
+  const [description, setDescription] = useState((params.description as string) || '');
+  const [category, setCategory] = useState((params.category as string) || '식비');
+  const [date, setDate] = useState(params.date ? parseISO(params.date as string) : new Date());
+  
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [rawText, setRawText] = useState('');
+
+  useEffect(() => {
+    if (isEdit) {
+      setEntryMode('direct');
+    }
+  }, [isEdit]);
+
+  // Filter categories based on current type
+  const filteredCategories = CATEGORIES.filter(cat => cat.type === type);
+
+  const handleTypeChange = (newType: TransactionType) => {
+    setType(newType);
+    // If current category is not in the new type's categories, reset to first one
+    const exists = CATEGORIES.find(c => c.name === category && c.type === newType);
+    if (!exists) {
+      const firstForType = CATEGORIES.find(c => c.type === newType);
+      if (firstForType) setCategory(firstForType.name);
+    }
+  };
 
   const handleKeyPress = (key: string) => {
     if (key === 'back') {
@@ -64,10 +92,7 @@ export default function AddEntryScreen() {
       try {
         const ocrResult = await scanReceipt(result.assets[0].base64, 'image/jpeg');
         if (ocrResult) {
-          setAmountStr(ocrResult.amount.toString());
-          setCategory(ocrResult.category);
-          setDescription(ocrResult.description);
-          if (ocrResult.date) setDate(new Date(ocrResult.date));
+          applyAiResult(ocrResult);
           Alert.alert('성공', '영수증 분석이 완료되었습니다!');
         }
       } catch (error) {
@@ -78,10 +103,46 @@ export default function AddEntryScreen() {
     }
   };
 
+  const handleTextAnalysis = async () => {
+    if (!rawText.trim()) {
+      Alert.alert('알림', '분석할 텍스트를 입력해주세요.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await parseTransactionText(rawText);
+      if (result) {
+        applyAiResult(result);
+        Alert.alert('성공', '텍스트 분석이 완료되었습니다!');
+        setEntryMode('direct'); // 결과 확인을 위해 입력 모드로 전환
+      } else {
+        Alert.alert('실패', '정보를 추출하지 못했습니다.');
+      }
+    } catch (error) {
+      Alert.alert('오류', '텍스트 분석 중 문제가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applyAiResult = (result: any) => {
+    setAmountStr(result.amount.toString());
+    setCategory(result.category);
+    setDescription(result.description);
+    if (result.type) setType(result.type);
+    if (result.date) setDate(new Date(result.date));
+  };
+
   const handleSave = async () => {
     const amount = parseInt(amountStr);
     if (amount <= 0) {
       Alert.alert('경고', '금액을 입력해주세요.');
+      return;
+    }
+
+    if (!description.trim()) {
+      Alert.alert('경고', '내용을 입력해주세요.');
       return;
     }
 
@@ -99,21 +160,39 @@ export default function AddEntryScreen() {
         .select('id')
         .eq('name', category)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (!catData) throw new Error('Category not found');
+      let categoryId = catData?.id;
 
-      const { error } = await supabase.from('transactions').insert([{
+      // If category not found, use '기타'
+      if (!categoryId) {
+        const { data: defaultCat } = await supabase.from('categories').select('id').eq('name', '기타').limit(1).single();
+        categoryId = defaultCat?.id;
+      }
+      
+      if (!categoryId) throw new Error('Category not found');
+
+      const txData = {
         group_id: profile.group_id,
         user_id: user.id,
-        category_id: catData.id,
+        category_id: categoryId,
         type,
         amount,
         description,
         date: format(date, 'yyyy-MM-dd'),
-      }]);
+      };
 
-      if (error) throw error;
+      if (isEdit) {
+        const { error } = await supabase
+          .from('transactions')
+          .update(txData)
+          .eq('id', params.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('transactions').insert([txData]);
+        if (error) throw error;
+      }
+
       router.back();
     } catch (error: any) {
       Alert.alert('오류', '저장 실패: ' + error.message);
@@ -123,32 +202,44 @@ export default function AddEntryScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      style={styles.container}
+    >
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.closeButton}>
           <X size={24} color="#64748b" />
         </Pressable>
-        <Text style={styles.headerTitle}>내역 추가</Text>
+        <Text style={styles.headerTitle}>{isEdit ? '내역 수정' : '내역 추가'}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Mode Toggle */}
-        <View style={styles.modeToggle}>
-          <Pressable 
-            onPress={() => setEntryMode('direct')}
-            style={[styles.modeButton, entryMode === 'direct' && styles.activeMode]}
-          >
-            <Text style={[styles.modeText, entryMode === 'direct' && styles.activeModeText]}>직접 입력</Text>
-          </Pressable>
-          <Pressable 
-            onPress={() => setEntryMode('ai')}
-            style={[styles.modeButton, entryMode === 'ai' && styles.activeMode]}
-          >
-            <Text style={[styles.modeText, entryMode === 'ai' && styles.activeModeText]}>AI 영수증 스캔</Text>
-          </Pressable>
-        </View>
+        {/* Mode Toggle - Hide in Edit Mode */}
+        {!isEdit && (
+          <View style={styles.modeToggle}>
+            <Pressable 
+              onPress={() => setEntryMode('direct')}
+              style={[styles.modeButton, entryMode === 'direct' && styles.activeMode]}
+            >
+              <Text style={[styles.modeText, entryMode === 'direct' && styles.activeModeText]}>직접</Text>
+            </Pressable>
+            <Pressable 
+              onPress={() => setEntryMode('text')}
+              style={[styles.modeButton, entryMode === 'text' && styles.activeMode]}
+            >
+              <Text style={[styles.modeText, entryMode === 'text' && styles.activeModeText]}>텍스트 분석</Text>
+            </Pressable>
+            <Pressable 
+              onPress={() => setEntryMode('ai')}
+              style={[styles.modeButton, entryMode === 'ai' && styles.activeMode]}
+            >
+              <Text style={[styles.modeText, entryMode === 'ai' && styles.activeModeText]}>사진 스캔</Text>
+            </Pressable>
+          </View>
+        )}
 
+        {/* AI Scan Mode */}
         {entryMode === 'ai' && (
           <Pressable style={styles.aiBox} onPress={handleScanReceipt} disabled={loading}>
             {loading ? (
@@ -163,21 +254,54 @@ export default function AddEntryScreen() {
           </Pressable>
         )}
 
-        {/* Type Toggle */}
-        <View style={styles.typeToggle}>
-          <Pressable 
-            onPress={() => setType('expense')}
-            style={[styles.typeButton, type === 'expense' && styles.activeExpense]}
-          >
-            <Text style={[styles.typeText, type === 'expense' && styles.activeExpenseText]}>지출</Text>
-          </Pressable>
-          <Pressable 
-            onPress={() => setType('income')}
-            style={[styles.typeButton, type === 'income' && styles.activeIncome]}
-          >
-            <Text style={[styles.typeText, type === 'income' && styles.activeIncomeText]}>수입</Text>
-          </Pressable>
-        </View>
+        {/* Text Analysis Mode */}
+        {entryMode === 'text' && (
+          <View style={styles.textBox}>
+            <View style={styles.textInputWrapper}>
+              <TextInput
+                style={styles.textArea}
+                multiline
+                placeholder="카드 결제 문자나 내역을 여기에 붙여넣으세요..."
+                value={rawText}
+                onChangeText={setRawText}
+                textAlignVertical="top"
+              />
+            </View>
+            <Pressable 
+              style={styles.analyzeButton} 
+              onPress={handleTextAnalysis}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <Wand2 size={20} color="white" />
+                  <Text style={styles.analyzeButtonText}>분석하기</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        )}
+
+        {/* Form Fields (Always Visible for Direct/Result Edit) */}
+        {/* Type Toggle - Hidden in AI Scan mode (Receipts are always expenses) */}
+        {entryMode !== 'ai' && (
+          <View style={styles.typeToggle}>
+            <Pressable 
+              onPress={() => handleTypeChange('expense')}
+              style={[styles.typeButton, type === 'expense' && styles.activeExpense]}
+            >
+              <Text style={[styles.typeText, type === 'expense' && styles.activeExpenseText]}>지출</Text>
+            </Pressable>
+            <Pressable 
+              onPress={() => handleTypeChange('income')}
+              style={[styles.typeButton, type === 'income' && styles.activeIncome]}
+            >
+              <Text style={[styles.typeText, type === 'income' && styles.activeIncomeText]}>수입</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Amount */}
         <View style={styles.amountBox}>
@@ -230,32 +354,35 @@ export default function AddEntryScreen() {
         )}
       </ScrollView>
 
-      {/* Keypad */}
-      <View style={styles.keypadContainer}>
-        <View style={styles.keypadRow}>
-          <KeyButton label="7" onPress={handleKeyPress} />
-          <KeyButton label="8" onPress={handleKeyPress} />
-          <KeyButton label="9" onPress={handleKeyPress} />
-          <KeyButton label="C" onPress={handleKeyPress} variant="action" />
+      {/* Keypad (Only visible in Direct Mode or when result is shown) */}
+      {(entryMode === 'direct' || entryMode === 'text') && (
+        <View style={styles.keypadContainer}>
+          <View style={styles.keypadRow}>
+            <KeyButton label="7" onPress={handleKeyPress} />
+            <KeyButton label="8" onPress={handleKeyPress} />
+            <KeyButton label="9" onPress={handleKeyPress} />
+            <KeyButton label="C" onPress={handleKeyPress} variant="action" />
+          </View>
+          <View style={styles.keypadRow}>
+            <KeyButton label="4" onPress={handleKeyPress} />
+            <KeyButton label="5" onPress={handleKeyPress} />
+            <KeyButton label="6" onPress={handleKeyPress} />
+            <KeyButton label="back" onPress={handleKeyPress} variant="action" icon={<Delete size={20} color="#6366f1" />} />
+          </View>
+                  <View style={styles.keypadRow}>
+                    <KeyButton label="1" onPress={handleKeyPress} />
+                    <KeyButton label="2" onPress={handleKeyPress} />
+                    <KeyButton label="3" onPress={handleKeyPress} />
+                    <KeyButton label={isEdit ? "수정" : "완료"} onPress={handleSave} variant="primary" icon={<CheckCircle2 size={24} color="white" />} />
+                  </View>
+          
+          <View style={styles.keypadRow}>
+            <KeyButton label="0" onPress={handleKeyPress} />
+            <KeyButton label="00" onPress={handleKeyPress} />
+            <View style={{ flex: 2 }} />
+          </View>
         </View>
-        <View style={styles.keypadRow}>
-          <KeyButton label="4" onPress={handleKeyPress} />
-          <KeyButton label="5" onPress={handleKeyPress} />
-          <KeyButton label="6" onPress={handleKeyPress} />
-          <KeyButton label="back" onPress={handleKeyPress} variant="action" icon={<Delete size={20} color="#6366f1" />} />
-        </View>
-        <View style={styles.keypadRow}>
-          <KeyButton label="1" onPress={handleKeyPress} />
-          <KeyButton label="2" onPress={handleKeyPress} />
-          <KeyButton label="3" onPress={handleKeyPress} />
-          <KeyButton label="완료" onPress={handleSave} variant="primary" icon={<CheckCircle2 size={24} color="white" />} />
-        </View>
-        <View style={styles.keypadRow}>
-          <KeyButton label="0" onPress={handleKeyPress} />
-          <KeyButton label="00" onPress={handleKeyPress} />
-          <View style={{ flex: 2 }} />
-        </View>
-      </View>
+      )}
 
       {/* Category Picker Modal */}
       <Modal visible={showCategoryPicker} transparent animationType="slide">
@@ -268,7 +395,7 @@ export default function AddEntryScreen() {
               </Pressable>
             </View>
             <ScrollView>
-              {DEFAULT_CATEGORIES.map((cat) => (
+              {filteredCategories.map((cat) => (
                 <Pressable 
                   key={cat.id} 
                   style={styles.categoryOption}
@@ -284,7 +411,7 @@ export default function AddEntryScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -297,11 +424,11 @@ function KeyButton({ label, onPress, variant = 'default', icon }: any) {
 
   return (
     <Pressable 
-      onPress={() => onPress(label === '완료' ? '' : label)}
-      style={[styles.keyButton, { backgroundColor: bgColor }, label === '완료' && { flex: 1, flexDirection: 'row', gap: 8 }]}
+      onPress={() => onPress(label === '완료' || label === '수정' ? '' : label)}
+      style={[styles.keyButton, { backgroundColor: bgColor }, (label === '완료' || label === '수정') && { flex: 1, flexDirection: 'row', gap: 8 }]}
     >
       {icon ? icon : <Text style={[styles.keyText, variant === 'primary' && { color: '#fff' }]}>{label}</Text>}
-      {label === '완료' && <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18 }}>완료</Text>}
+      {(label === '완료' || label === '수정') && <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18 }}>{label}</Text>}
     </Pressable>
   );
 }
@@ -355,7 +482,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   modeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#94a3b8',
   },
@@ -382,6 +509,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748b',
     marginTop: 4,
+  },
+  textBox: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  textInputWrapper: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  textArea: {
+    height: 100,
+    fontSize: 15,
+    color: '#1e293b',
+    textAlignVertical: 'top',
+  },
+  analyzeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6366f1',
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
+    elevation: 2,
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  analyzeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   typeToggle: {
     flexDirection: 'row',

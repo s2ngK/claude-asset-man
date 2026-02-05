@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { supabase } from '../../src/lib/supabaseClient';
-import { format, endOfMonth, parse } from 'date-fns';
+import { format, endOfMonth, parse, subMonths, startOfMonth } from 'date-fns';
 import { Users, User } from 'lucide-react-native';
 
 interface CategoryStat {
@@ -18,6 +18,12 @@ interface MemberStat {
   percent?: number;
 }
 
+interface TrendStat {
+  month: string;
+  income: number;
+  expense: number;
+}
+
 export default function StatsScreen() {
   const [activeTab, setActiveTab] = useState<'my' | 'group'>('my');
   const [loading, setLoading] = useState(true);
@@ -25,6 +31,7 @@ export default function StatsScreen() {
   
   const [categoryData, setCategoryData] = useState<CategoryStat[]>([]);
   const [memberRanking, setMemberRanking] = useState<MemberStat[]>([]);
+  const [trendData, setTrendData] = useState<TrendStat[]>([]);
   const [totalExpense, setTotalExpense] = useState(0);
 
   const fetchStatsData = useCallback(async () => {
@@ -36,10 +43,13 @@ export default function StatsScreen() {
       const { data: profile } = await supabase.from('profiles').select('group_id').eq('id', user.id).single();
       if (!profile?.group_id) return;
 
-      // Calculate dates for the selected month
+      // Dates for Monthly Stats (Category, Member)
       const monthDate = parse(currentMonth, 'yyyy-MM', new Date());
       const startDate = format(monthDate, 'yyyy-MM-dd');
       const endDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
+
+      // Dates for Trend (Last 6 Months)
+      const trendStartDate = format(startOfMonth(subMonths(monthDate, 5)), 'yyyy-MM-dd');
 
       const userIdParam = activeTab === 'my' ? user.id : null;
 
@@ -57,7 +67,18 @@ export default function StatsScreen() {
       const total = (catStats || []).reduce((acc: number, curr: CategoryStat) => acc + curr.total_amount, 0);
       setTotalExpense(total);
 
-      // 2. Fetch Member Stats (Only for Group tab)
+      // 2. Fetch Trend Stats
+      const { data: tData, error: tError } = await supabase.rpc('get_monthly_trend', {
+        _group_id: profile.group_id,
+        _start_date: trendStartDate,
+        _end_date: endDate,
+        _user_id: userIdParam
+      });
+
+      if (tError) throw tError;
+      setTrendData(tData || []);
+
+      // 3. Fetch Member Stats (Only for Group tab)
       if (activeTab === 'group') {
         const { data: memStats, error: memError } = await supabase.rpc('get_monthly_member_stats', {
           _group_id: profile.group_id,
@@ -89,6 +110,12 @@ export default function StatsScreen() {
   useEffect(() => {
     fetchStatsData();
   }, [fetchStatsData]);
+
+  // Helper for trend chart max value
+  const maxTrendValue = Math.max(
+    ...(trendData?.map(d => Math.max(d.income, d.expense)) || [0]),
+    1 // Avoid division by zero
+  );
 
   return (
     <View style={styles.container}>
@@ -149,6 +176,49 @@ export default function StatsScreen() {
                 )}
               </View>
             </View>
+
+            {/* Trend Chart (Simple Bar) */}
+            {trendData.length > 0 && (
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>최근 6개월 추이</Text>
+                <View style={styles.trendChart}>
+                  {trendData.map((item, index) => (
+                    <View key={index} style={styles.trendColumn}>
+                      <View style={styles.barsContainer}>
+                        {/* Income Bar */}
+                        <View style={[
+                          styles.trendBar, 
+                          { 
+                            height: `${(item.income / maxTrendValue) * 100}%`,
+                            backgroundColor: '#10b981',
+                            opacity: 0.5
+                          }
+                        ]} />
+                        {/* Expense Bar */}
+                        <View style={[
+                          styles.trendBar, 
+                          { 
+                            height: `${(item.expense / maxTrendValue) * 100}%`,
+                            backgroundColor: '#f43f5e'
+                          }
+                        ]} />
+                      </View>
+                      <Text style={styles.trendLabel}>{item.month.slice(5)}월</Text>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.legendContainer}>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: '#10b981', opacity: 0.5 }]} />
+                    <Text style={styles.legendText}>수입</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: '#f43f5e' }]} />
+                    <Text style={styles.legendText}>지출</Text>
+                  </View>
+                </View>
+              </View>
+            )}
 
             {/* Member Ranking */}
             {activeTab === 'group' && memberRanking.length > 0 && (
@@ -281,6 +351,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#0f172a',
     marginTop: 10,
+    marginBottom: 4,
   },
   rankingCard: {
     backgroundColor: 'white',
@@ -314,5 +385,56 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#10b981',
     borderRadius: 4,
+  },
+  trendChart: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    height: 150,
+    alignItems: 'flex-end',
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  trendColumn: {
+    alignItems: 'center',
+    flex: 1,
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  barsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
+    height: '85%', // Reserve space for label
+  },
+  trendBar: {
+    width: 8,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    minHeight: 4,
+  },
+  trendLabel: {
+    marginTop: 8,
+    fontSize: 10,
+    color: '#94a3b8',
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 8,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 10,
+    color: '#64748b',
   }
 });

@@ -1,5 +1,5 @@
 import { format, endOfMonth, parse } from 'date-fns';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Plus, Search, Settings } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -57,9 +57,11 @@ export default function HomeScreen() {
     }
   }, [currentMonth]);
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchTransactions();
+    }, [fetchTransactions])
+  );
 
   const groupedTransactions = useMemo(() => {
     const groups: { [date: string]: Transaction[] } = {};
@@ -77,7 +79,21 @@ export default function HomeScreen() {
         <Text style={styles.countText}>{item[1].length}건</Text>
       </View>
       {item[1].map((tx) => (
-        <View key={tx.id} style={styles.transactionItem}>
+        <Pressable 
+          key={tx.id} 
+          style={styles.transactionItem}
+          onPress={() => router.push({
+            pathname: '/add-entry',
+            params: {
+              id: tx.id,
+              amount: tx.amount.toString(),
+              description: tx.description,
+              category: (tx as any).categories?.name,
+              type: tx.type,
+              date: tx.date
+            }
+          })}
+        >
           <View style={styles.transactionIconBox}>
              <Text style={{fontSize: 20}}>{(tx as any).categories?.icon || '💰'}</Text>
           </View>
@@ -91,7 +107,7 @@ export default function HomeScreen() {
           ]}>
             {tx.type === 'expense' ? '-' : '+'}{new Intl.NumberFormat('ko-KR').format(tx.amount)}원
           </Text>
-        </View>
+        </Pressable>
       ))}
     </View>
   );
