@@ -2,304 +2,198 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import AddEntryModal from '@/components/AddEntryModal';
 import TransactionItem from '@/components/TransactionItem';
 import UndoToast from '@/components/UndoToast';
 import { Transaction, TransactionType } from '@/types';
-import { DEFAULT_CATEGORIES } from '@/lib/constants';
+import {
+  getTransactions, createTransaction, deleteTransaction,
+  getCategories, getLocalUser,
+  type Transaction as ApiTransaction,
+} from '@/lib/api';
 
-interface MainViewProps {
-  groupName: string;
-  inviteCode: string;
+// API 응답 → 내부 타입 변환
+function toLocalTx(t: ApiTransaction): Transaction {
+  return {
+    id: t.id,
+    group_id: t.group_id,
+    user_id: t.user_id,
+    category_id: t.category_id,
+    type: t.type as TransactionType,
+    amount: t.amount,
+    description: t.description ?? '',
+    date: t.date,
+    created_at: t.created_at ?? '',
+    categories: t.category_name ? { id: t.category_id, name: t.category_name, icon: t.category_icon ?? '', color: t.category_color ?? '' } : null,
+  } as any;
 }
 
-export default function MainView({ groupName, inviteCode }: MainViewProps) {
+export default function MainView() {
   const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(false);
-  
-  // Undo related state
-  const [deletedItem, setDeletedItem] = useState<{ item: Transaction, index: number } | null>(null);
+  const [deletedItem, setDeletedItem] = useState<{ item: Transaction; index: number } | null>(null);
   const [showUndo, setShowUndo] = useState(false);
   const [deleteTimer, setDeleteTimer] = useState<NodeJS.Timeout | null>(null);
 
-  const supabase = createClient();
+  const user = getLocalUser();
 
-  // 1. Fetch Transactions
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const startDate = `${currentMonth}-01`;
-    const endDate = `${currentMonth}-31`; // Simple approximation
-
-    const { data, error } = await supabase
-      .from('transactions')
-      .select(`
-        *,
-        categories (id, name, icon, color),
-        profiles (full_name, avatar_url)
-      `)
-      .eq('user_id', user.id)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching transactions:', error);
-    } else {
-      setTransactions(data as Transaction[]);
+    try {
+      const data = await getTransactions(currentMonth);
+      setTransactions(data.map(toLocalTx));
+    } catch (err) {
+      console.error('fetch error', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [currentMonth, supabase]);
+  }, [currentMonth]);
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+  useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
-  // 2. Save Transaction (Insert)
   const handleSaveEntry = async (amount: number, categoryName: string, desc: string, type: TransactionType, date: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user');
-
-      const { data: profile } = await supabase.from('profiles').select('group_id').eq('id', user.id).single();
-      if (!profile?.group_id) throw new Error('No group');
-
-      // Find Category ID by Name
-      const defaultCat = DEFAULT_CATEGORIES.find(c => c.name === categoryName);
-      
-      let { data: catData } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('name', categoryName)
-        .eq('type', type) // Ensure type matches
-        .maybeSingle(); 
-
-      if (!catData) {
-         // Fallback: Query without type if name is unique enough, or just pick first
-         const { data: retryCat } = await supabase.from('categories').select('id').eq('name', categoryName).limit(1).single();
-         catData = retryCat;
-      }
-
-      if (!catData) throw new Error(`Category not found: ${categoryName}`);
-
-      const newTx = {
-        group_id: profile.group_id,
-        user_id: user.id,
-        category_id: catData.id,
-        type,
-        amount,
-        description: desc,
-        date,
-      };
-
-      const { error } = await supabase.from('transactions').insert([newTx]);
-
-      if (error) throw error;
-
-      await fetchTransactions(); // Refresh list
-    } catch (error: any) {
-      console.error('Save failed:', error);
-      alert('저장에 실패했습니다: ' + error.message);
+      const cats = await getCategories();
+      const cat = cats.find(c => c.name === categoryName && c.type === type) ?? cats.find(c => c.name === categoryName);
+      if (!cat) throw new Error(`카테고리를 찾을 수 없습니다: ${categoryName}`);
+      await createTransaction({ category_id: cat.id, type, amount, description: desc, date });
+      await fetchTransactions();
+    } catch (err: any) {
+      alert('저장 실패: ' + err.message);
     }
   };
 
-  // 3. Delete Logic with Undo
   const handleDelete = (id: string) => {
     const index = transactions.findIndex(t => t.id === id);
     if (index === -1) return;
-
     const itemToDelete = transactions[index];
-    
-    // UI Optimistic Update
     setTransactions(prev => prev.filter(t => t.id !== id));
     setDeletedItem({ item: itemToDelete, index });
     setShowUndo(true);
-
-    // Set Timer for actual deletion
     if (deleteTimer) clearTimeout(deleteTimer);
-    
     const timer = setTimeout(async () => {
-      // Actually delete from DB
-      const { error } = await supabase.from('transactions').delete().eq('id', id);
-      if (error) {
-        console.error('Delete failed:', error);
-        alert('삭제 중 오류가 발생했습니다.');
-        fetchTransactions(); 
-      }
+      try { await deleteTransaction(id); } catch { fetchTransactions(); }
       setShowUndo(false);
       setDeletedItem(null);
-    }, 4000); // 4 seconds delay
-
+    }, 4000);
     setDeleteTimer(timer);
   };
 
   const handleUndo = () => {
     if (deleteTimer) clearTimeout(deleteTimer);
     if (deletedItem) {
-      const newTransactions = [...transactions];
-      newTransactions.splice(deletedItem.index, 0, deletedItem.item);
-      setTransactions(newTransactions);
+      const next = [...transactions];
+      next.splice(deletedItem.index, 0, deletedItem.item);
+      setTransactions(next);
     }
     setShowUndo(false);
     setDeletedItem(null);
   };
 
-  // Grouping for Display
   const groupedTransactions = useMemo(() => {
     const groups: { [date: string]: Transaction[] } = {};
-    transactions.forEach(t => {
-      if (!groups[t.date]) groups[t.date] = [];
-      groups[t.date].push(t);
-    });
+    transactions.forEach(t => { if (!groups[t.date]) groups[t.date] = []; groups[t.date].push(t); });
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
   }, [transactions]);
 
-  // Summary
   const summary = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-    const expense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+    const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const expense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     return { income, expense, balance: income - expense };
   }, [transactions]);
 
-  // 로그아웃은 SettingsView로 이동했으므로 여기서는 제거하거나 간단히 유지
-  // 기획 변경: 헤더의 '설정(톱니바퀴)' 버튼이 SettingsView로 이동하므로 여기서 직접 로그아웃 할 필요 없음.
-  // 대신 검색 버튼과 설정 버튼만 남깁니다.
-
   return (
     <div className="relative min-h-screen pb-24 bg-slate-50 dark:bg-slate-950">
-      {/* Header with Month Selector */}
       <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 p-4">
-         <div className="flex items-center justify-between max-w-md mx-auto">
-             <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                    <input 
-                        type="month" 
-                        value={currentMonth}
-                        onChange={(e) => setCurrentMonth(e.target.value)}
-                        className="bg-transparent text-lg font-bold border-none p-0 focus:ring-0 cursor-pointer"
-                    />
-                    <span className="material-symbols-outlined text-slate-400">expand_more</span>
-                </div>
-                <p className="text-xs text-slate-500 font-medium">{groupName}</p>
-             </div>
-             <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="text-slate-400" onClick={() => alert('검색 기능은 준비 중입니다.')}>
-                  <span className="material-symbols-outlined">search</span>
-                </Button>
-                <Link href="/settings">
-                  <Button variant="ghost" size="icon" className="text-slate-400">
-                    <span className="material-symbols-outlined">settings</span>
-                  </Button>
-                </Link>
-             </div>
-         </div>
+        <div className="flex items-center justify-between max-w-md mx-auto">
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <input type="month" value={currentMonth} onChange={(e) => setCurrentMonth(e.target.value)}
+                className="bg-transparent text-lg font-bold border-none p-0 focus:ring-0 cursor-pointer" />
+              <span className="material-symbols-outlined text-slate-400">expand_more</span>
+            </div>
+            <p className="text-xs text-slate-500 font-medium">{user?.display_name ?? ''}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <Link href="/settings">
+              <Button variant="ghost" size="icon" className="text-slate-400">
+                <span className="material-symbols-outlined">settings</span>
+              </Button>
+            </Link>
+          </div>
+        </div>
       </header>
 
-      {/* Summary Card */}
       <div className="p-4 max-w-md mx-auto">
         <div className="rounded-2xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-4">
-          <div className="flex justify-between items-end">
-            <div className="flex flex-col gap-1">
-              <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">이번 달 잔액</p>
-              <p className="text-slate-900 dark:text-white tracking-tight text-3xl font-bold leading-tight">
-                {new Intl.NumberFormat('ko-KR').format(summary.balance)}원
-              </p>
-            </div>
+          <div>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">이번 달 잔액</p>
+            <p className="text-slate-900 dark:text-white tracking-tight text-3xl font-bold">
+              {new Intl.NumberFormat('ko-KR').format(summary.balance)}원
+            </p>
           </div>
           <div className="h-[1px] bg-slate-100 dark:bg-slate-800 w-full" />
           <div className="flex justify-between gap-4">
-            <div className="flex flex-col gap-1 flex-1">
+            <div>
               <p className="text-slate-500 dark:text-slate-400 text-[10px] font-medium uppercase tracking-wider">수입</p>
-              <p className="text-emerald-500 text-lg font-bold leading-tight">
-                {new Intl.NumberFormat('ko-KR').format(summary.income)}
-              </p>
+              <p className="text-emerald-500 text-lg font-bold">{new Intl.NumberFormat('ko-KR').format(summary.income)}</p>
             </div>
-            <div className="flex flex-col gap-1 flex-1 text-right">
+            <div className="text-right">
               <p className="text-slate-500 dark:text-slate-400 text-[10px] font-medium uppercase tracking-wider">지출</p>
-              <p className="text-rose-500 text-lg font-bold leading-tight">
-                {new Intl.NumberFormat('ko-KR').format(summary.expense)}
-              </p>
+              <p className="text-rose-500 text-lg font-bold">{new Intl.NumberFormat('ko-KR').format(summary.expense)}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Transactions List */}
-      <main className="space-y-0 max-w-md mx-auto">
+      <main className="max-w-md mx-auto">
         {loading && transactions.length === 0 ? (
-           <div className="p-8 text-center text-slate-400">로딩 중...</div>
+          <div className="p-8 text-center text-slate-400">로딩 중...</div>
         ) : transactions.length === 0 ? (
-            <div className="bg-slate-100 dark:bg-slate-900/50 rounded-xl p-8 text-center text-slate-500 mx-4 mt-4">
+          <div className="bg-slate-100 dark:bg-slate-900/50 rounded-xl p-8 text-center text-slate-500 mx-4 mt-4">
             <span className="material-symbols-outlined text-4xl mb-2">receipt_long</span>
             <p>아직 내역이 없습니다.</p>
-            <p className="text-sm">아래 + 버튼을 눌러 첫 내역을 추가해보세요!</p>
-            </div>
+          </div>
         ) : (
-            groupedTransactions.map(([date, items]) => (
-                <div key={date}>
-                    <div className="sticky top-[73px] z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-2 px-4 border-b border-slate-100 dark:border-slate-800/50 flex justify-between items-center">
-                    <h3 className="text-slate-900 dark:text-white text-xs font-bold leading-tight tracking-tight uppercase">
-                        {date}
-                    </h3>
-                    <span className="text-[10px] text-slate-400 font-medium">
-                        {items.length}건
-                    </span>
-                    </div>
-                    <div>
-                    {items.map(item => (
-                        <TransactionItem 
-                        key={item.id} 
-                        item={item} 
-                        onDelete={() => handleDelete(item.id)}
-                        />
-                    ))}
-                    </div>
-                </div>
-            ))
+          groupedTransactions.map(([date, items]) => (
+            <div key={date}>
+              <div className="sticky top-[73px] z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-2 px-4 border-b border-slate-100 dark:border-slate-800/50 flex justify-between items-center">
+                <h3 className="text-xs font-bold">{date}</h3>
+                <span className="text-[10px] text-slate-400">{items.length}건</span>
+              </div>
+              {items.map(item => (
+                <TransactionItem key={item.id} item={item} onDelete={() => handleDelete(item.id)} />
+              ))}
+            </div>
+          ))
         )}
       </main>
 
-      {/* Floating Action Button */}
-      <button 
-        onClick={() => setIsAddEntryOpen(true)}
-        className="fixed right-6 bottom-24 z-40 flex items-center justify-center rounded-full size-14 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 active:scale-95 transition-transform hover:scale-105"
-      >
+      <button onClick={() => setIsAddEntryOpen(true)}
+        className="fixed right-6 bottom-24 z-40 flex items-center justify-center rounded-full size-14 bg-emerald-500 text-white shadow-lg active:scale-95 transition-transform">
         <span className="material-symbols-outlined text-[32px]">add</span>
       </button>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 z-40 pb-safe">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 z-40">
         <div className="flex justify-around items-center h-16 max-w-md mx-auto px-6">
           <Link href="/" className="flex flex-col items-center gap-1 text-emerald-500">
             <span className="material-symbols-outlined text-[24px]">home</span>
             <span className="text-[10px] font-bold">홈</span>
           </Link>
-          <Link href="/stats" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600">
+          <Link href="/stats" className="flex flex-col items-center gap-1 text-slate-400">
             <span className="material-symbols-outlined text-[24px]">insights</span>
             <span className="text-[10px] font-medium">통계</span>
           </Link>
         </div>
       </nav>
 
-      {/* Add Entry Modal */}
       {isAddEntryOpen && (
-        <AddEntryModal 
-          onClose={() => setIsAddEntryOpen(false)} 
-          onSave={handleSaveEntry}
-        />
+        <AddEntryModal onClose={() => setIsAddEntryOpen(false)} onSave={handleSaveEntry} />
       )}
-
-      {/* Undo Toast */}
-      {showUndo && (
-        <UndoToast onUndo={handleUndo} onClose={() => setShowUndo(false)} />
-      )}
+      {showUndo && <UndoToast onUndo={handleUndo} onClose={() => setShowUndo(false)} />}
     </div>
   );
 }

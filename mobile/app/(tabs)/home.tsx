@@ -1,110 +1,63 @@
-import { format, endOfMonth, parse } from 'date-fns';
+import { format } from 'date-fns';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Plus, Search, Settings } from 'lucide-react-native';
+import { Plus, Settings } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { supabase } from '../../src/lib/supabaseClient';
-import { Transaction } from '../../src/types';
+import { getTransactions, getSummary, getLocalUser, type Transaction } from '../../src/lib/api';
 
 export default function HomeScreen() {
   const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [currentMonth, setCurrentMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [loading, setLoading] = useState(false);
-  const [groupName, setGroupName] = useState('My Group');
   const [summary, setSummary] = useState({ income: 0, expense: 0, balance: 0 });
+  const [displayName, setDisplayName] = useState('');
 
-  const fetchTransactions = useCallback(async () => {
+  useEffect(() => {
+    getLocalUser().then(u => { if (u) setDisplayName(u.display_name); });
+  }, []);
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const startDate = `${currentMonth}-01`;
-      const monthDate = parse(currentMonth, 'yyyy-MM', new Date());
-      const endDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
-
-      // 1. Fetch Summary from RPC
-      const { data: summaryData, error: summaryError } = await supabase.rpc('get_monthly_summary', {
-        _user_id: user.id,
-        _month_start: startDate,
-        _month_end: endDate
-      });
-
-      if (!summaryError && summaryData && summaryData.length > 0) {
-        setSummary(summaryData[0]);
-      }
-
-      // 2. Fetch Transactions List
-      const { data, error } = await supabase
-        .from('transactions')
-        .select(`
-          *,
-          categories (id, name, icon, color)
-        `)
-        .eq('user_id', user.id)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTransactions(data as Transaction[]);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
+      const [txList, sum] = await Promise.all([
+        getTransactions(currentMonth),
+        getSummary(currentMonth),
+      ]);
+      setTransactions(txList);
+      setSummary(sum);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
   }, [currentMonth]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchTransactions();
-    }, [fetchTransactions])
-  );
+  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
 
-  const groupedTransactions = useMemo(() => {
-    const groups: { [date: string]: Transaction[] } = {};
-    transactions.forEach(t => {
-      if (!groups[t.date]) groups[t.date] = [];
-      groups[t.date].push(t);
-    });
-    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+  const grouped = useMemo(() => {
+    const g: { [date: string]: Transaction[] } = {};
+    transactions.forEach(t => { if (!g[t.date]) g[t.date] = []; g[t.date].push(t); });
+    return Object.entries(g).sort((a, b) => b[0].localeCompare(a[0]));
   }, [transactions]);
 
   const renderItem = ({ item }: { item: [string, Transaction[]] }) => (
-    <View key={item[0]}>
+    <View>
       <View style={styles.dateHeader}>
         <Text style={styles.dateText}>{item[0]}</Text>
         <Text style={styles.countText}>{item[1].length}건</Text>
       </View>
-      {item[1].map((tx) => (
-        <Pressable 
-          key={tx.id} 
-          style={styles.transactionItem}
-          onPress={() => router.push({
-            pathname: '/add-entry',
-            params: {
-              id: tx.id,
-              amount: tx.amount.toString(),
-              description: tx.description,
-              category: (tx as any).categories?.name,
-              type: tx.type,
-              date: tx.date
-            }
-          })}
-        >
-          <View style={styles.transactionIconBox}>
-             <Text style={{fontSize: 20}}>{(tx as any).categories?.icon || '💰'}</Text>
+      {item[1].map(tx => (
+        <Pressable key={tx.id} style={styles.txItem}
+          onPress={() => router.push({ pathname: '/add-entry', params: { id: tx.id, amount: tx.amount.toString(), description: tx.description ?? '', category: tx.category_name ?? '', category_id: tx.category_id, type: tx.type, date: tx.date } })}>
+          <View style={styles.txIcon}>
+            <Text style={{ fontSize: 20 }}>{tx.category_icon || '💰'}</Text>
           </View>
-          <View style={styles.transactionInfo}>
-            <Text style={styles.transactionDesc}>{tx.description}</Text>
-            <Text style={styles.transactionCat}>{(tx as any).categories?.name}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.txDesc}>{tx.description || '-'}</Text>
+            <Text style={styles.txCat}>{tx.category_name}</Text>
           </View>
-          <Text style={[
-            styles.transactionAmount,
-            { color: tx.type === 'expense' ? '#f43f5e' : '#10b981' }
-          ]}>
+          <Text style={[styles.txAmount, { color: tx.type === 'expense' ? '#f43f5e' : '#10b981' }]}>
             {tx.type === 'expense' ? '-' : '+'}{new Intl.NumberFormat('ko-KR').format(tx.amount)}원
           </Text>
         </Pressable>
@@ -114,28 +67,19 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.monthText}>{currentMonth}</Text>
-          <Text style={styles.groupText}>{groupName}</Text>
+          <Text style={styles.nameText}>{displayName}</Text>
         </View>
-        <View style={styles.headerActions}>
-          <Pressable style={styles.iconButton}>
-            <Search size={24} color="#94a3b8" />
-          </Pressable>
-          <Pressable style={styles.iconButton} onPress={() => router.push('/settings')}>
-            <Settings size={24} color="#94a3b8" />
-          </Pressable>
-        </View>
+        <Pressable onPress={() => router.push('/settings')} style={styles.iconBtn}>
+          <Settings size={24} color="#94a3b8" />
+        </Pressable>
       </View>
 
-      {/* Summary */}
       <View style={styles.summaryCard}>
         <Text style={styles.summaryLabel}>이번 달 잔액</Text>
-        <Text style={styles.balanceText}>
-          {new Intl.NumberFormat('ko-KR').format(summary.balance)}원
-        </Text>
+        <Text style={styles.balanceText}>{new Intl.NumberFormat('ko-KR').format(summary.balance)}원</Text>
         <View style={styles.divider} />
         <View style={styles.summaryRow}>
           <View>
@@ -149,30 +93,19 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* List */}
       {loading && transactions.length === 0 ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color="#10b981" />
+        <ActivityIndicator style={{ marginTop: 40 }} color="#6366f1" />
       ) : (
         <FlatList
-          data={groupedTransactions}
+          data={grouped}
           renderItem={renderItem}
           keyExtractor={item => item[0]}
           contentContainerStyle={{ paddingBottom: 100 }}
-          ListEmptyComponent={
-            !loading ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>아직 내역이 없습니다.</Text>
-              </View>
-            ) : null
-          }
+          ListEmptyComponent={!loading ? <View style={styles.empty}><Text style={styles.emptyText}>아직 내역이 없습니다.</Text></View> : null}
         />
       )}
 
-      {/* FAB */}
-      <Pressable 
-        style={styles.fab}
-        onPress={() => router.push('/add-entry')}
-      >
+      <Pressable style={styles.fab} onPress={() => router.push('/add-entry')}>
         <Plus size={32} color="white" />
       </Pressable>
     </View>
@@ -180,157 +113,28 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    backgroundColor: 'white',
-  },
-  monthText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#0f172a',
-  },
-  groupText: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconButton: {
-    padding: 8,
-  },
-  summaryCard: {
-    margin: 20,
-    padding: 24,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  balanceText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#0f172a',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#f1f5f9',
-    marginVertical: 16,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  rowLabel: {
-    fontSize: 10,
-    color: '#64748b',
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  incomeText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#10b981',
-  },
-  expenseText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#f43f5e',
-  },
-  dateHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#f8fafc',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  dateText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#0f172a',
-  },
-  countText: {
-    fontSize: 10,
-    color: '#94a3b8',
-  },
-  transactionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  transactionIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  transactionInfo: {
-    flex: 1,
-  },
-  transactionDesc: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#0f172a',
-  },
-  transactionCat: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#94a3b8',
-  },
-  fab: {
-    position: 'absolute',
-    right: 24,
-    bottom: 40,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#10b981',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-  }
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20, backgroundColor: 'white' },
+  monthText: { fontSize: 20, fontWeight: 'bold', color: '#0f172a' },
+  nameText: { fontSize: 12, color: '#64748b' },
+  iconBtn: { padding: 8 },
+  summaryCard: { margin: 20, padding: 24, backgroundColor: 'white', borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0' },
+  summaryLabel: { fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  balanceText: { fontSize: 32, fontWeight: 'bold', color: '#0f172a' },
+  divider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 16 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  rowLabel: { fontSize: 10, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 },
+  incomeText: { fontSize: 18, fontWeight: 'bold', color: '#10b981' },
+  expenseText: { fontSize: 18, fontWeight: 'bold', color: '#f43f5e' },
+  dateHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  dateText: { fontSize: 12, fontWeight: 'bold', color: '#0f172a' },
+  countText: { fontSize: 10, color: '#94a3b8' },
+  txItem: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  txIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  txDesc: { fontSize: 16, fontWeight: '500', color: '#0f172a' },
+  txCat: { fontSize: 12, color: '#94a3b8' },
+  txAmount: { fontSize: 16, fontWeight: 'bold' },
+  empty: { padding: 40, alignItems: 'center' },
+  emptyText: { color: '#94a3b8' },
+  fab: { position: 'absolute', right: 24, bottom: 40, width: 56, height: 56, borderRadius: 28, backgroundColor: '#6366f1', alignItems: 'center', justifyContent: 'center', elevation: 4 },
 });

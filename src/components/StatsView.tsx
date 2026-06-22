@@ -1,148 +1,45 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { createClient } from '@/lib/supabaseClient';
-import { Transaction } from '@/types';
-import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { getCategoryStats, getTrend, getMemberStats, getLocalUser, type CategoryStat, type TrendItem, type MemberStat } from '@/lib/api';
 
-interface StatsViewProps {
-  groupName: string;
-}
-
-export default function StatsView({ groupName }: StatsViewProps) {
+export default function StatsView() {
   const [activeTab, setActiveTab] = useState<'my' | 'group'>('my');
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7));
-  const supabase = createClient();
+  const [categoryData, setCategoryData] = useState<CategoryStat[]>([]);
+  const [trendData, setTrendData] = useState<Array<TrendItem & { month_label: string; balance: number }>>([]);
+  const [memberRanking, setMemberRanking] = useState<MemberStat[]>([]);
 
-  const fetchStatsData = useCallback(async () => {
+  const user = getLocalUser();
+
+  const fetchStats = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    // Get group_id
-    const { data: profile } = await supabase.from('profiles').select('group_id').eq('id', user.id).single();
-    if (!profile?.group_id) return;
-
-    // Fetch last 6 months of data for trend
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-    sixMonthsAgo.setDate(1);
-    const startDate = sixMonthsAgo.toISOString().split('T')[0];
-
-    const { data, error } = await supabase
-      .from('transactions')
-      .select(`
-        *,
-        categories (name, icon, color),
-        profiles (full_name)
-      `)
-      .eq('group_id', profile.group_id)
-      .gte('date', startDate)
-      .order('date', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching stats:', error);
-    } else {
-      setTransactions(data as Transaction[]);
+    try {
+      const userOnly = activeTab === 'my';
+      const [cats, trend, members] = await Promise.all([
+        getCategoryStats(currentMonth, userOnly),
+        getTrend(),
+        activeTab === 'group' ? getMemberStats(currentMonth) : Promise.resolve([]),
+      ]);
+      setCategoryData(cats);
+      setTrendData(trend.map(t => ({ ...t, month_label: `${t.month.slice(5)}월`, balance: t.income - t.expense })));
+      setMemberRanking(members);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [supabase]);
+  }, [currentMonth, activeTab]);
 
-  useEffect(() => {
-    fetchStatsData();
-  }, [fetchStatsData]);
+  useEffect(() => { fetchStats(); }, [fetchStats]);
 
-  // Current User ID for 'my' stats
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
-  }, [supabase]);
-
-  // Filtered transactions based on Tab (My vs Group)
-  const filteredByTab = useMemo(() => {
-    if (activeTab === 'my') {
-      return transactions.filter(t => t.user_id === currentUserId);
-    }
-    return transactions;
-  }, [transactions, activeTab, currentUserId]);
-
-  // 1. Category Data (Current Month)
-  const categoryData = useMemo(() => {
-    const currentMonthTxs = filteredByTab.filter(t => t.date.startsWith(currentMonth) && t.type === 'expense');
-    const aggregation: { [key: string]: number } = {};
-    
-    currentMonthTxs.forEach(t => {
-      const name = t.categories?.name || '기타';
-      aggregation[name] = (aggregation[name] || 0) + t.amount;
-    });
-
-    return Object.entries(aggregation).map(([name, value]) => {
-      const catInfo = DEFAULT_CATEGORIES.find(c => c.name === name);
-      return {
-        name,
-        value,
-        color: catInfo?.color || '#808080'
-      };
-    }).sort((a, b) => b.value - a.value);
-  }, [filteredByTab, currentMonth]);
-
-  // 2. Trend Data (Last 6 Months)
-  const trendData = useMemo(() => {
-    const months: { [key: string]: { month: string, income: number, expense: number, balance: number } } = {};
-    
-    // Initialize last 6 months
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const m = d.toISOString().slice(0, 7);
-      months[m] = { month: `${d.getMonth() + 1}월`, income: 0, expense: 0, balance: 0 };
-    }
-
-    filteredByTab.forEach(t => {
-      const m = t.date.slice(0, 7);
-      if (months[m]) {
-        if (t.type === 'income') months[m].income += t.amount;
-        else months[m].expense += t.amount;
-      }
-    });
-
-    Object.values(months).forEach(m => {
-      m.balance = m.income - m.expense;
-    });
-
-    return Object.values(months);
-  }, [filteredByTab]);
-
-  // 3. Member Ranking (Group Tab only)
-  const memberRanking = useMemo(() => {
-    if (activeTab !== 'group') return [];
-    const currentMonthTxs = transactions.filter(t => t.date.startsWith(currentMonth) && t.type === 'expense');
-    const aggregation: { [key: string]: { name: string, amount: number } } = {};
-
-    currentMonthTxs.forEach(t => {
-      const uid = t.user_id;
-      const name = t.profiles?.full_name || '알 수 없음';
-      if (!aggregation[uid]) aggregation[uid] = { name, amount: 0 };
-      aggregation[uid].amount += t.amount;
-    });
-
-    const total = Object.values(aggregation).reduce((acc, curr) => acc + curr.amount, 0);
-
-    return Object.values(aggregation)
-      .map(m => ({
-        ...m,
-        percent: total > 0 ? Math.round((m.amount / total) * 100) : 0
-      }))
-      .sort((a, b) => b.amount - a.amount);
-  }, [transactions, currentMonth, activeTab]);
-
-  const totalExpense = categoryData.reduce((acc, curr) => acc + curr.value, 0);
+  const totalExpense = categoryData.reduce((s, c) => s + c.total, 0);
   const formatAmount = (amount: number) => new Intl.NumberFormat('ko-KR').format(amount) + '원';
+  const chartData = categoryData.map(c => ({ name: c.category_name, value: c.total, color: c.color || '#808080' }));
 
   return (
     <div className="min-h-screen pb-24 bg-slate-50 dark:bg-slate-950">
@@ -194,30 +91,24 @@ export default function StatsView({ groupName }: StatsViewProps) {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={categoryData.length > 0 ? categoryData : [{ name: '데이터 없음', value: 1, color: '#f1f5f9' }]}
-                  innerRadius={65}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
+                  data={chartData.length > 0 ? chartData : [{ name: '데이터 없음', value: 1, color: '#f1f5f9' }]}
+                  innerRadius={65} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none"
                 >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                  {categoryData.length === 0 && <Cell fill="#f1f5f9" />}
+                  {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  {chartData.length === 0 && <Cell fill="#f1f5f9" />}
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute flex flex-col items-center">
               <span className="text-slate-400 text-[10px] font-bold uppercase">최다 지출</span>
-              <span className="text-lg font-bold">{categoryData[0]?.name || '-'}</span>
+              <span className="text-lg font-bold">{chartData[0]?.name || '-'}</span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mt-8">
-            {categoryData.slice(0, 4).map(item => (
+            {chartData.slice(0, 4).map(item => (
               <div key={item.name} className="flex items-center gap-2">
-                <div className="size-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                <div className="size-3 rounded-full" style={{ backgroundColor: item.color }} />
                 <div className="min-w-0">
                   <p className="text-[10px] text-slate-500 truncate">{item.name}</p>
                   <p className="text-xs font-bold truncate">{formatAmount(item.value)}</p>
@@ -234,7 +125,7 @@ export default function StatsView({ groupName }: StatsViewProps) {
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                <XAxis dataKey="month_label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                 <YAxis hide />
                 <Tooltip 
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
@@ -251,26 +142,23 @@ export default function StatsView({ groupName }: StatsViewProps) {
         {/* Member Ranking (Group only) */}
         {activeTab === 'group' && memberRanking.length > 0 && (
           <div className="space-y-4">
-             <h2 className="text-lg font-bold px-1">구성원별 지출</h2>
-             <div className="space-y-3">
-               {memberRanking.map(member => (
-                 <div key={member.name} className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
-                    <div className="flex justify-between items-center mb-2">
-                       <span className="font-bold text-sm">{member.name}</span>
-                       <span className="font-bold text-sm">{formatAmount(member.amount)}</span>
+            <h2 className="text-lg font-bold px-1">구성원별 지출</h2>
+            <div className="space-y-3">
+              {memberRanking.map(member => (
+                <div key={member.user_id} className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-bold text-sm">{member.display_name}</span>
+                    <span className="font-bold text-sm">{formatAmount(member.total)}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${member.percentage}%` }} />
                     </div>
-                    <div className="flex items-center gap-3">
-                       <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
-                            style={{ width: `${member.percent}%` }}
-                          />
-                       </div>
-                       <span className="text-[10px] font-bold text-slate-400 w-8">{member.percent}%</span>
-                    </div>
-                 </div>
-               ))}
-             </div>
+                    <span className="text-[10px] font-bold text-slate-400 w-8">{member.percentage}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
