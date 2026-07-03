@@ -80,7 +80,6 @@ docker compose up --build
 ## 참고 디렉토리
 
 - `references/design/` — UI 참고용 Vite/React 프로토타입 (프로덕션 아님)
-- `.taskmaster/` — 작업 관리 설정 및 기획 문서
 - `supabase/` — 이전 Supabase 스키마/마이그레이션 (더 이상 사용하지 않음, 참고용으로만 보관)
 
 자세한 아키텍처 설명은 [CLAUDE.md](./CLAUDE.md)를 참고하세요.

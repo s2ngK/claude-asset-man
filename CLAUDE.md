@@ -82,5 +82,4 @@ API_URL=http://localhost:8000
 ## Other Directories
 
 - `references/design/` — Vite/React prototype, not production; UI reference only
-- `.taskmaster/` — Task management config and PRD docs
 - `supabase/` — Legacy schema/migrations, no longer used
