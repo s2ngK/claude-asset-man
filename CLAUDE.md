@@ -19,11 +19,15 @@ npm run lint     # ESLint
 ```
 
 ### Backend (`backend/` directory)
+Dependencies and the venv are managed by [uv](https://docs.astral.sh/uv/) (`pyproject.toml` + `uv.lock`), not pip/requirements.txt.
 ```bash
 cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload   # API at http://localhost:8000
+uv sync                         # creates .venv, installs deps (incl. dev group: ruff, pytest)
+uv run alembic upgrade head     # apply DB schema migrations
+uv run uvicorn app.main:app --reload   # API at http://localhost:8000
+uv run ruff check .             # lint
+uv run ruff format .            # format
+uv run pytest                   # tests
 ```
 
 ### Docker (full stack)
@@ -36,7 +40,7 @@ Backend data persists in `backend/data/ledger.db` (SQLite file, bind-mounted).
 
 ### Backend (`backend/`)
 
-**FastAPI app** in `backend/app/main.py` — registers routes, runs `Base.metadata.create_all()` and `seed_initial_data()` on startup.
+**FastAPI app** in `backend/app/main.py` — registers routes, runs `seed_initial_data()` on startup. DB schema is managed by Alembic (`backend/alembic/versions/`), not `create_all()` — after changing `app/models.py`, run `alembic revision --autogenerate -m "..."` and review the generated migration.
 
 **Routes** (`backend/app/routes/`):
 - `auth.py` — `POST /auth/login` — validates invite code, issues JWT
@@ -45,7 +49,7 @@ Backend data persists in `backend/data/ledger.db` (SQLite file, bind-mounted).
 - `stats.py` — monthly summary, category breakdown, member stats, 6-month trend
 - `admin.py` — create groups/users (protected by `ADMIN_KEY` env var)
 
-**Auth flow:** users submit an invite code → server looks up the matching user → returns a JWT. No email/password. JWT carries `user_id`, `group_id`, `display_name`.
+**Auth flow:** users submit an invite code → server looks up the matching user → returns a JWT. No email/password. JWT carries `user_id`, `group_id`, `display_name`. `POST /api/auth/login` is rate-limited (10/minute per IP via `slowapi`, see `app/rate_limit.py`) since the invite code is the only credential.
 
 **DB:** SQLAlchemy ORM models in `backend/app/models.py`. Tables: `groups → users → transactions + categories`. Categories with `group_id IS NULL` are system defaults seeded on startup (`backend/app/seed.py`).
 

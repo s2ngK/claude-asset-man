@@ -1,20 +1,31 @@
 import os
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .database import engine, Base
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+from .rate_limit import limiter
+from .routes import admin, auth, categories, stats, transactions
 from .seed import seed_initial_data
-from .routes import auth, transactions, categories, stats, admin
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    # Schema is managed by Alembic migrations (see backend/alembic/) — run
+    # `alembic upgrade head` before starting the app instead of relying on
+    # create_all().
     seed_initial_data()
     yield
 
 
 app = FastAPI(title="Group Ledger API", version="1.0.0", lifespan=lifespan)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

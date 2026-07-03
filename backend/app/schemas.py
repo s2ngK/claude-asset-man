@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 from datetime import datetime
-from typing import Optional
+
 from pydantic import BaseModel
 
 
 class LoginRequest(BaseModel):
     invite_code: str
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -13,6 +15,7 @@ class TokenResponse(BaseModel):
     user_id: str
     group_id: str
     display_name: str
+
 
 class UserResponse(BaseModel):
     id: str
@@ -23,11 +26,11 @@ class UserResponse(BaseModel):
 
 class CategoryResponse(BaseModel):
     id: str
-    group_id: Optional[str] = None
+    group_id: str | None = None
     type: str
     name: str
-    icon: Optional[str] = None
-    color: Optional[str] = None
+    icon: str | None = None
+    color: str | None = None
     is_default: bool
     model_config = {"from_attributes": True}
 
@@ -36,30 +39,32 @@ class TransactionCreate(BaseModel):
     category_id: str
     type: str
     amount: int
-    description: Optional[str] = None
+    description: str | None = None
     date: str
 
+
 class TransactionUpdate(BaseModel):
-    category_id: Optional[str] = None
-    type: Optional[str] = None
-    amount: Optional[int] = None
-    description: Optional[str] = None
-    date: Optional[str] = None
+    category_id: str | None = None
+    type: str | None = None
+    amount: int | None = None
+    description: str | None = None
+    date: str | None = None
+
 
 class TransactionResponse(BaseModel):
     id: str
     group_id: str
     user_id: str
-    user_display_name: Optional[str] = None
+    user_display_name: str | None = None
     category_id: str
-    category_name: Optional[str] = None
-    category_icon: Optional[str] = None
-    category_color: Optional[str] = None
+    category_name: str | None = None
+    category_icon: str | None = None
+    category_color: str | None = None
     type: str
     amount: int
-    description: Optional[str] = None
+    description: str | None = None
     date: str
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
 
 class MonthlySummary(BaseModel):
@@ -67,18 +72,21 @@ class MonthlySummary(BaseModel):
     expense: int
     balance: int
 
+
 class CategoryStat(BaseModel):
     category_id: str
     category_name: str
-    icon: Optional[str] = None
-    color: Optional[str] = None
+    icon: str | None = None
+    color: str | None = None
     total: int
     percentage: float
+
 
 class TrendItem(BaseModel):
     month: str
     income: int
     expense: int
+
 
 class MemberStat(BaseModel):
     user_id: str
@@ -91,8 +99,9 @@ class GroupCreate(BaseModel):
     name: str
     admin_key: str
 
+
 class UserCreate(BaseModel):
     group_id: str
     display_name: str
     admin_key: str
-    invite_code: Optional[str] = None
+    invite_code: str | None = None
