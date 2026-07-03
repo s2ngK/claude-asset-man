@@ -4,17 +4,26 @@
 
 ## 구성
 
-- **`/`** — Next.js 16 웹 PWA (TypeScript, Tailwind v4, shadcn/ui)
-- **`backend/`** — FastAPI + SQLAlchemy + SQLite REST API
-
-## 개발 배경
-
-초기에는 Supabase(Auth + Postgres)와 Google Gemini(영수증 OCR, 문자 파싱)를 사용하는 구조로 시작했고, 웹과 모바일(React Native/Expo) 두 앱을 함께 운영했습니다. 이후 다음과 같은 방향으로 정리했습니다.
-
-1. **AI 기능 제거** — 영수증 스캔, 문자 자동 분석 등 AI 기반 입력 기능을 걷어내고, 카테고리·금액·간단한 적요만 입력하는 단순한 수동 입력 방식으로 전환
-2. **백엔드 자체 구축** — Supabase가 과한 것으로 판단하여, 학습 목적을 겸해 Python(FastAPI) + SQLite 기반의 자체 백엔드로 교체
-3. **인증 단순화** — 이메일/비밀번호 대신 초대 코드(invite code) 입력만으로 로그인하고 JWT를 발급받는 방식으로 변경
-4. **모바일 앱 정리** — 모바일 서비스는 더 이상 운영하지 않기로 하여 `mobile/` 디렉토리를 완전히 제거하고 웹 앱 단일 서비스로 정리
+```
+claude-asset-man/
+├── src/                    # Next.js 16 웹 PWA (TypeScript, Tailwind v4, shadcn/ui)
+│   ├── app/                # 라우트 (login/, stats/, settings/ 등)
+│   ├── components/         # UI 컴포넌트 (components/ui는 shadcn)
+│   ├── lib/                # API 클라이언트 등 유틸
+│   └── types/              # 공용 타입 정의
+├── backend/                # FastAPI + SQLAlchemy + SQLite REST API
+│   ├── app/
+│   │   ├── routes/         # auth, transactions, categories, stats, admin
+│   │   ├── models.py       # SQLAlchemy ORM 모델
+│   │   ├── schemas.py      # Pydantic 스키마
+│   │   └── main.py         # FastAPI 앱 엔트리포인트
+│   ├── alembic/            # DB 스키마 마이그레이션
+│   ├── tests/              # pytest 테스트
+│   └── pyproject.toml      # uv 기반 의존성 관리
+├── references/design/      # UI 참고용 프로토타입 (프로덕션 아님)
+├── supabase/               # 이전 Supabase 스키마 (참고용, 더 이상 사용 안 함)
+└── docker-compose.yml
+```
 
 ## 기술 스택
 
@@ -31,9 +40,9 @@
 
 ```bash
 cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
 ```
 
 서버 시작 시 기본 카테고리가 자동으로 시딩되며, `http://localhost:8000/health`로 헬스체크가 가능합니다.
