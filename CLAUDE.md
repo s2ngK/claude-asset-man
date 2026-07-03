@@ -4,10 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A group personal finance (가계부) app — web PWA + mobile — backed by a self-hosted Python API:
+A group personal finance (가계부) web app backed by a self-hosted Python API:
 
 - **Root (`/`)** — Next.js 16 web PWA (TypeScript, Tailwind v4, shadcn/ui)
-- **`mobile/`** — React Native / Expo SDK 54 app (Expo Router)
 - **`backend/`** — FastAPI + SQLAlchemy + SQLite REST API
 
 ## Commands
@@ -17,14 +16,6 @@ A group personal finance (가계부) app — web PWA + mobile — backed by a se
 npm run dev      # Dev server at http://localhost:3000
 npm run build    # Production build (--webpack flag)
 npm run lint     # ESLint
-```
-
-### Mobile App (`mobile/` directory)
-```bash
-cd mobile
-npm run start    # Expo dev server
-npm run ios      # iOS simulator
-npm run android  # Android emulator
 ```
 
 ### Backend (`backend/` directory)
@@ -69,26 +60,11 @@ Backend data persists in `backend/data/ledger.db` (SQLite file, bind-mounted).
 - `AddEntryModal` — manual entry form (no AI scanning)
 - `StatsView` / `SettingsView` — lazy-loaded via `/stats` and `/settings` routes
 
-### Mobile App (`mobile/`)
-
-**Routing:** Expo Router file-based. `mobile/app/index.tsx` reads the stored token (SecureStore) and redirects to `/(tabs)/home` or `/login`.
-
-**API client:** `mobile/src/lib/api.ts` — mirrors the web client, but uses `expo-secure-store` for token persistence instead of localStorage/cookies. Async token getters throughout.
-
-**Add/Edit flow:** `mobile/app/add-entry.tsx` handles create and edit (detects edit via `useLocalSearchParams().id`). Input is manual only — direct numpad entry. AI text/scan modes removed.
-
-**Navigation:** Root layout `mobile/app/_layout.tsx` sets up the Stack: `(tabs)`, `settings`, `add-entry` (modal), `login`. `settings.tsx` is a standalone Stack screen, not inside tabs.
-
 ## Environment Variables
 
 **Web (`.env.local`):**
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-**Mobile (`mobile/.env`):**
-```
-EXPO_PUBLIC_API_URL=http://localhost:8000
 ```
 
 **Docker (`docker-compose.yml` env or `.env`):**
@@ -101,7 +77,7 @@ API_URL=http://localhost:8000
 
 ## Key Types
 
-`src/types/index.ts` defines `Transaction`, `Category`, `TransactionType` used across web components. Mobile mirrors these in `mobile/src/types/`.
+`src/types/index.ts` defines `Transaction`, `Category`, `TransactionType` used across web components.
 
 ## Other Directories
 
