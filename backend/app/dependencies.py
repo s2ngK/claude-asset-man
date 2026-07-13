@@ -12,6 +12,7 @@ from .database import get_db
 
 SECRET_KEY = os.getenv("JWT_SECRET", "change-this-secret-in-production")
 ALGORITHM = "HS256"
+ADMIN_KEY = os.getenv("ADMIN_KEY", "change-this-admin-key")
 
 security = HTTPBearer()
 
@@ -32,3 +33,13 @@ def get_current_user(
     if not user:
         raise HTTPException(status_code=401, detail="사용자를 찾을 수 없습니다.")
     return user
+
+
+def check_admin_key(x_admin_key: str) -> None:
+    # Not a FastAPI Depends(): route handlers call this from inside their own
+    # body (like login's invite_code check) so that a wrong key still counts
+    # as a hit against @limiter.limit — a Depends() is resolved before the
+    # decorated endpoint function runs, so failures there never reach the
+    # rate limiter.
+    if x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="관리자 키가 올바르지 않습니다.")

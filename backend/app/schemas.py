@@ -97,11 +97,9 @@ class MemberStat(BaseModel):
 
 class GroupCreate(BaseModel):
     name: str
-    admin_key: str
 
 
 class UserCreate(BaseModel):
     group_id: str
     display_name: str
-    admin_key: str
     invite_code: str | None = None
