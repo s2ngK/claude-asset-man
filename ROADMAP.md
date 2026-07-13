@@ -7,9 +7,11 @@
 ## 진행 중
 
 - [ ] `fix/admin-header-auth` 브랜치 main 머지 여부 확인 — admin API를 `X-Admin-Key` 헤더 기반으로 전환하고 rate limiting 추가한 작업
+- [ ] `fix/admin-header-auth`, `docs/roadmap-file` 브랜치 GitHub push 여부 결정 (현재 `main`만 push됨)
 
 ## 다음 작업 (백로그)
 
+- [ ] 유출됐던 Supabase Personal Access Token 재발급/폐기 확인 (git 히스토리에선 제거 완료, 토큰 자체 회전 필요)
 - [ ] `update-claude-md`, `change-claude` 스테일 브랜치 정리 여부 결정 (둘 다 main에 완전히 흡수된 상태)
 - [ ] 프론트엔드 화면 수가 늘어나면 서버 상태관리 라이브러리(react-query 등) 도입 검토
 - [ ] `npm run lint` 실행 시 `Invalid project directory provided` 에러 원인 조사
@@ -29,3 +31,4 @@
 - [x] pytest 테스트 스위트 추가 (인증, 거래 CRUD, 그룹 스코핑, rate limit)
 - [x] 로그인(`/api/auth/login`) rate limiting 추가
 - [x] README 폴더 구조 정리
+- [x] GitHub remote 연결 (public — private 생성이 안 되는 플랜)
