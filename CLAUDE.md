@@ -47,9 +47,9 @@ Backend data persists in `backend/data/ledger.db` (SQLite file, bind-mounted).
 - `transactions.py` — CRUD for transactions, scoped to the caller's group
 - `categories.py` — list categories (system defaults + group-specific)
 - `stats.py` — monthly summary, category breakdown, member stats, 6-month trend
-- `admin.py` — create groups/users (protected by `ADMIN_KEY` env var)
+- `admin.py` — create/list groups/users, protected by the `X-Admin-Key` header (must equal `ADMIN_KEY` env var); the check happens inside each route body (not a `Depends`) so failed attempts still count toward rate limiting
 
-**Auth flow:** users submit an invite code → server looks up the matching user → returns a JWT. No email/password. JWT carries `user_id`, `group_id`, `display_name`. `POST /api/auth/login` is rate-limited (10/minute per IP via `slowapi`, see `app/rate_limit.py`) since the invite code is the only credential.
+**Auth flow:** users submit an invite code → server looks up the matching user → returns a JWT. No email/password. JWT carries `user_id`, `group_id`, `display_name`. `POST /api/auth/login` and all `admin.py` routes are rate-limited (10/minute per IP via `slowapi`, see `app/rate_limit.py`) since the invite code / admin key are the only credentials.
 
 **DB:** SQLAlchemy ORM models in `backend/app/models.py`. Tables: `groups → users → transactions + categories`. Categories with `group_id IS NULL` are system defaults seeded on startup (`backend/app/seed.py`).
 
