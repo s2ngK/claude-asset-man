@@ -9,6 +9,8 @@ A group personal finance (가계부) web app backed by a self-hosted Python API:
 - **Root (`/`)** — Next.js 16 web PWA (TypeScript, Tailwind v4, shadcn/ui)
 - **`backend/`** — FastAPI + SQLAlchemy + SQLite REST API
 
+Current work status and next tasks are tracked in [ROADMAP.md](./ROADMAP.md) — check it for what's in progress, backlogged, or intentionally on hold, and keep it updated as work completes.
+
 ## Commands
 
 ### Web App (root directory)
