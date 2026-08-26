@@ -7,6 +7,7 @@ import AddEntryModal from '@/components/AddEntryModal';
 import TransactionItem from '@/components/TransactionItem';
 import UndoToast from '@/components/UndoToast';
 import { Transaction, TransactionType } from '@/types';
+import { getErrorMessage } from '@/lib/utils';
 import {
   getTransactions, createTransaction, deleteTransaction,
   getCategories, getLocalUser,
@@ -26,7 +27,7 @@ function toLocalTx(t: ApiTransaction): Transaction {
     date: t.date,
     created_at: t.created_at ?? '',
     categories: t.category_name ? { id: t.category_id, name: t.category_name, icon: t.category_icon ?? '', color: t.category_color ?? '' } : null,
-  } as any;
+  };
 }
 
 export default function MainView() {
@@ -61,8 +62,8 @@ export default function MainView() {
       if (!cat) throw new Error(`카테고리를 찾을 수 없습니다: ${categoryName}`);
       await createTransaction({ category_id: cat.id, type, amount, description: desc, date });
       await fetchTransactions();
-    } catch (err: any) {
-      alert('저장 실패: ' + err.message);
+    } catch (err) {
+      alert('저장 실패: ' + getErrorMessage(err, '알 수 없는 오류'));
     }
   };
 

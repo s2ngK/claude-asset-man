@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { login } from '@/lib/api';
+import { getErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,8 +22,8 @@ export default function LoginPage() {
       await login(inviteCode.trim());
       router.push('/');
       router.refresh();
-    } catch (err: any) {
-      alert(err.message || '로그인에 실패했습니다.');
+    } catch (err) {
+      alert(getErrorMessage(err, '로그인에 실패했습니다.'));
     } finally {
       setLoading(false);
     }

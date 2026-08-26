@@ -9,15 +9,14 @@ import { Button } from './ui/button';
 interface AddEntryModalProps {
   onClose: () => void;
   onSave: (amount: number, categoryName: string, description: string, type: TransactionType, date: string) => void;
-  initialData?: any;
 }
 
-const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initialData }) => {
-  const [type, setType] = useState<TransactionType>(initialData?.type || 'expense');
-  const [amountStr, setAmountStr] = useState(initialData?.amount?.toString() || '0');
-  const [selectedCat, setSelectedCat] = useState(initialData?.category || '식비');
-  const [description, setDescription] = useState(initialData?.description || '');
-  const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
+const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave }) => {
+  const [type, setType] = useState<TransactionType>('expense');
+  const [amountStr, setAmountStr] = useState('0');
+  const [selectedCat, setSelectedCat] = useState('식비');
+  const [description, setDescription] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
   const handleKeyPress = (key: string) => {
     if (key === 'back') { setAmountStr((prev) => prev.length > 1 ? prev.slice(0, -1) : '0'); return; }
