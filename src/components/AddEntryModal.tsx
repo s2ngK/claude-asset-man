@@ -29,6 +29,19 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
   const [selectedCat, setSelectedCat] = useState(initial?.categoryName ?? '식비');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().split('T')[0]);
+  // +/- 를 누르면 지금까지의 값이 여기로 확정되고, 키패드는 다음 피연산자를 받는다.
+  const [pending, setPending] = useState<{ value: number; op: '+' | '-' } | null>(null);
+
+  const fmt = (n: number) => new Intl.NumberFormat('ko-KR').format(n);
+  const currentAmount = parseInt(amountStr.replace(/[^0-9]/g, '') || '0', 10);
+  const evaluated = pending === null
+    ? currentAmount
+    : pending.op === '+' ? pending.value + currentAmount : pending.value - currentAmount;
+
+  // 수정 모드에서 금액을 다 지우면 **원래 값이 placeholder 로 남는다.** 그대로 저장하면
+  // 원래 금액이 유지된다 — 서버가 amount > 0 만 받으므로 0 을 보낼 방법도 없다.
+  const showsPlaceholder = isEditing && pending === null && amountStr === '0';
+  const amountToSave = showsPlaceholder ? initial.amount : evaluated;
 
   // 카테고리 목록이 수입/지출로 갈린다. 종류를 바꿨는데 이전 선택이 새 목록에 없으면
   // `<select>` 는 첫 항목을 보여주지만 state 는 옛 이름을 들고 있다 — 그대로 저장하면
@@ -41,7 +54,13 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
 
   const handleKeyPress = (key: string) => {
     if (key === 'back') { setAmountStr((prev) => prev.length > 1 ? prev.slice(0, -1) : '0'); return; }
-    if (key === 'C') { setAmountStr('0'); return; }
+    if (key === 'C') { setAmountStr('0'); setPending(null); return; }
+    if (key === '+' || key === '-') {
+      // placeholder 상태에서 누르면 원래 금액에서 시작한다 (0 에서 시작하면 쓸모가 없다).
+      setPending({ value: amountToSave, op: key });
+      setAmountStr('0');
+      return;
+    }
     setAmountStr((prev) => {
       if (prev === '0') return key === '00' ? '0' : key;
       if (prev.length > 12) return prev;
@@ -50,11 +69,10 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
   };
 
   const handleDone = () => {
-    onSave(parseInt(amountStr.replace(/[^0-9]/g, '') || '0'), selectedCat, description, type, date);
+    if (amountToSave <= 0) return; // 서버 스키마가 amount > 0 을 요구한다
+    onSave(amountToSave, selectedCat, description, type, date);
     onClose();
   };
-
-  const formattedAmount = new Intl.NumberFormat('ko-KR').format(parseInt(amountStr.replace(/[^0-9]/g, '') || '0'));
 
   return (
     <div className="fixed inset-0 z-50 bg-white dark:bg-slate-950 flex flex-col max-w-md mx-auto h-full animate-in slide-in-from-bottom duration-300">
@@ -73,9 +91,21 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
 
         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-6 flex flex-col gap-1 text-right">
           <span className="text-slate-400 text-xs font-bold">{type === 'expense' ? '지출 금액' : '수입 금액'}</span>
-          <div className="text-indigo-600 dark:text-indigo-400 text-4xl font-bold tracking-tight">
-            {formattedAmount}<span className="text-xl text-slate-400 ml-1">원</span>
+          {pending && (
+            <div className="text-slate-400 text-sm font-medium">
+              {/* 연산자를 막 누른 참이면 "12,000 + 0" 대신 "12,000 +" 로 둔다 — 아직 안 찍은 0 이다 */}
+              {fmt(pending.value)} {pending.op}{amountStr === '0' ? '' : ` ${fmt(currentAmount)}`}
+            </div>
+          )}
+          <div className={cn(
+            "text-4xl font-bold tracking-tight",
+            showsPlaceholder ? "text-slate-300 dark:text-slate-700" : "text-indigo-600 dark:text-indigo-400"
+          )}>
+            {fmt(amountToSave)}<span className="text-xl text-slate-400 ml-1">원</span>
           </div>
+          {showsPlaceholder && (
+            <span className="text-[11px] font-medium text-slate-400">비워두면 원래 금액이 그대로 저장됩니다</span>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">
@@ -109,6 +139,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
         <div className="grid grid-cols-4 gap-3">
           {['7','8','9','C','4','5','6','back','1','2','3','+','0','00','-','완료'].map(label => (
             <KeypadButton key={label} label={label} onClick={handleKeyPress} onDone={handleDone}
+              disabled={label === '완료' && amountToSave <= 0}
               variant={label === '완료' ? 'primary' : ['C','back','+','-'].includes(label) ? 'action' : 'number'} />
           ))}
         </div>
@@ -120,11 +151,12 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
   );
 };
 
-const KeypadButton: React.FC<{ label: string; onClick: (k: string) => void; onDone: () => void; variant?: 'number' | 'action' | 'primary'; }> = ({ label, onClick, onDone, variant = 'number' }) => {
+const KeypadButton: React.FC<{ label: string; onClick: (k: string) => void; onDone: () => void; variant?: 'number' | 'action' | 'primary'; disabled?: boolean; }> = ({ label, onClick, onDone, variant = 'number', disabled = false }) => {
   const bgColor = variant === 'primary' ? 'bg-indigo-600 text-white' : variant === 'action' ? 'bg-indigo-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white';
   return (
-    <button onClick={() => label === '완료' ? onDone() : onClick(label)}
-      className={cn("h-14 flex items-center justify-center rounded-2xl text-xl font-bold shadow-sm active:scale-95 transition-transform", bgColor)}>
+    <button onClick={() => label === '완료' ? onDone() : onClick(label)} disabled={disabled}
+      className={cn("h-14 flex items-center justify-center rounded-2xl text-xl font-bold shadow-sm active:scale-95 transition-transform", bgColor,
+        disabled && "opacity-40 cursor-not-allowed active:scale-100")}>
       {label === 'back' ? <span className="material-symbols-outlined text-2xl">backspace</span> : label}
     </button>
   );
