@@ -174,12 +174,17 @@ export default function MainView() {
       sortOrder === 'newest' ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0]));
   }, [visibleTransactions, sortOrder]);
 
-  // 합계는 **보이는 것** 기준이다. 필터를 걸었는데 합계가 안 바뀌면 무엇을 더한 건지 알 수 없다.
-  const summary = useMemo(() => {
-    const income = visibleTransactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const expense = visibleTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const totals = (list: Transaction[]) => {
+    const income = list.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const expense = list.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     return { income, expense, balance: income - expense };
-  }, [visibleTransactions]);
+  };
+
+  // 요약 카드는 **필터와 무관하게 그 달 전체**를 보여준다. 기준점이 필터마다 흔들리면
+  // (수입만 보면 지출이 0 으로 떨어진다) 무엇과 비교하는 숫자인지 알 수 없다.
+  const summary = useMemo(() => totals(transactions), [transactions]);
+  // 대신 "지금 걸러낸 것들의 합" 은 목록 바로 위 한 줄로 따로 말해준다.
+  const filteredSummary = useMemo(() => totals(visibleTransactions), [visibleTransactions]);
 
   return (
     <div className="relative min-h-screen pb-24 bg-slate-50 dark:bg-slate-950">
@@ -210,9 +215,7 @@ export default function MainView() {
       <div className="p-4 max-w-md mx-auto">
         <div className="rounded-2xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-4">
           <div>
-            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">
-              {filterActive ? '선택한 내역 합계' : '이번 달 잔액'}
-            </p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">이번 달 잔액</p>
             <p className="text-slate-900 dark:text-white tracking-tight text-3xl font-bold">
               {new Intl.NumberFormat('ko-KR').format(summary.balance)}원
             </p>
@@ -259,6 +262,14 @@ export default function MainView() {
           {sortOrder === 'newest' ? '최신순' : '오래된순'}
         </button>
       </div>
+
+      {filterActive && (
+        <p className="px-4 pb-2 max-w-md mx-auto text-[11px] font-bold text-slate-500 dark:text-slate-400">
+          필터 결과 {visibleTransactions.length}건
+          {filteredSummary.income > 0 && ` · 수입 ${new Intl.NumberFormat('ko-KR').format(filteredSummary.income)}원`}
+          {filteredSummary.expense > 0 && ` · 지출 ${new Intl.NumberFormat('ko-KR').format(filteredSummary.expense)}원`}
+        </p>
+      )}
 
       <main className="max-w-md mx-auto">
         {loading && transactions.length === 0 ? (
