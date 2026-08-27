@@ -1,8 +1,9 @@
-# 거래 등록 흐름
+# 거래 등록·수정 흐름
 
-← [그룹 가계부](README.md) · 관련 [엔드포인트별 규칙](api-rules.md) [데이터 모델](data-model.md)
+← [그룹 가계부](README.md) · 관련 [목록 정렬과 필터](flow-list-sort-filter.md) [엔드포인트별 규칙](api-rules.md) [데이터 모델](data-model.md)
 
 거래 하나가 저장될 때까지의 경로. **이름 기반 카테고리 매칭**이라는 함정이 여기 있다.
+추가와 수정은 **같은 모달·같은 경로**를 쓴다.
 
 # 흐름
 
@@ -19,18 +20,49 @@ sequenceDiagram
     A->>S: GET /api/categories
     S-->>V: 서버 카테고리 목록 (id 포함)
     V->>V: name + type이 같은 것을 찾아 id 획득
-    V->>A: createTransaction({category_id, ...})
-    A->>S: POST /api/transactions
-    S-->>V: 201
+    alt 추가 (editing === null)
+        V->>A: createTransaction({category_id, ...})
+        A->>S: POST /api/transactions
+        S-->>V: 201
+    else 수정 (editing !== null)
+        V->>A: updateTransaction(id, {category_id, ...})
+        A->>S: PUT /api/transactions/{id}
+        S-->>V: 200
+    end
     V->>V: fetchTransactions() 재조회
 ```
+
+`getCategories()` 는 `MainView` 가 **마운트 때 한 번 받아 state 에 들고 있다.** 저장할 때는
+그 목록을 쓰고, 비어 있을 때만 그 자리에서 받아온다.
+
+# 추가와 수정은 같은 모달이다
+
+`AddEntryModal` 에 `initial` 을 주면 **수정 모드**가 된다. 폼이 그 값으로 채워지고 제목이
+"내역 수정" 으로 바뀐다. 모달은 그 이상을 모른다 — **만들기냐 고치기냐의 판단은 `MainView`**
+가 `editing` 상태로 한다. 모달은 값만 모아 `onSave` 로 돌려준다.
+
+목록에서 항목을 **그냥 누르면**(드래그 아님) 수정이 열린다. 단 **자기가 쓴 것만** 열린다 —
+남의 내역은 `onEdit` 을 아예 넘기지 않는다. 서버가 403 을 주므로
+(→ [인증과 그룹 격리](auth-and-scoping.md)) 열어봐야 저장에서 막힌다.
+
+> [!NOTE]
+> 수정해도 `created_at` 은 그대로다. 서버가 그 컬럼을 건드리지 않는다.
+> 목록 정렬이 `created_at` 을 쓰므로(→ [목록 정렬과 필터](flow-list-sort-filter.md))
+> **금액만 고친 항목이 맨 위로 튀어오르지 않는다.**
+
+## 종류를 바꾸면 카테고리도 따라간다
+
+카테고리 select 는 `type` 으로 갈린다. 지출에서 `식비` 를 고른 채 수입으로 바꾸면 `식비` 는
+새 목록에 없다 — `<select>` 는 첫 항목(`급여`)을 **보여주지만** state 는 `식비` 를 들고 있다.
+그대로 저장하면 화면과 다른 카테고리가 붙는다. 그래서 종류를 바꿀 때 현재 선택이 새 목록에
+없으면 첫 항목으로 맞춘다.
 
 # 핵심: 모달은 이름만 넘긴다
 
 `AddEntryModal`은 `category_id`를 모른다. `src/lib/constants.ts`의 `DEFAULT_CATEGORIES`로 select를 그리기 때문에 **로컬 상수의 이름 문자열**만 갖고 있다.
 
 그래서 `MainView.handleSaveEntry`가 저장할 때마다:
-1. `getCategories()`로 **서버 카테고리를 매번 새로 받아온다**
+1. 마운트 때 받아둔 **서버 카테고리 목록**을 쓴다 (비어 있으면 그 자리에서 `getCategories()`)
 2. `name`과 `type`이 모두 일치하는 것을 찾는다
 3. 못 찾으면 `name`만으로 한 번 더 찾는다 (fallback)
 4. 그래도 없으면 에러
@@ -74,9 +106,9 @@ sequenceDiagram
 
 # 개선한다면
 
-1. **모달이 `category_id`를 넘기게 한다.** 화면 진입 시 `getCategories()`를 한 번만 호출해 재사용하면
-   - 저장할 때마다 나가는 추가 요청이 사라지고
-   - `constants.ts` ↔ `seed.py` 결합이 끊어진다
+1. **모달이 `category_id`를 넘기게 한다.** `MainView` 가 목록을 캐시하면서 저장할 때마다
+   나가던 요청은 없앴지만, **`constants.ts` ↔ `seed.py` 이름 결합은 그대로 남아 있다.**
+   모달이 서버 카테고리를 직접 받아 id 를 넘기면 그 결합이 끊어진다
 2. `DEFAULT_CATEGORIES`는 서버 응답이 오기 전 **초기 렌더용 폴백**으로만 남긴다
 
 → [#17](https://github.com/s2ngK/claude-asset-man/issues/17) · [결함 목록](known-issues.md)

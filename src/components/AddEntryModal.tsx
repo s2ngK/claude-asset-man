@@ -9,14 +9,35 @@ import { Button } from './ui/button';
 interface AddEntryModalProps {
   onClose: () => void;
   onSave: (amount: number, categoryName: string, description: string, type: TransactionType, date: string) => void;
+  /**
+   * 있으면 **수정 모드**다. 폼을 이 값으로 채우고 문구만 바꾼다.
+   * 만들기냐 고치기냐의 판단은 `MainView` 가 한다 — 이 컴포넌트는 값만 모아 돌려준다.
+   */
+  initial?: {
+    amount: number;
+    categoryName: string;
+    description: string;
+    type: TransactionType;
+    date: string;
+  };
 }
 
-const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave }) => {
-  const [type, setType] = useState<TransactionType>('expense');
-  const [amountStr, setAmountStr] = useState('0');
-  const [selectedCat, setSelectedCat] = useState('식비');
-  const [description, setDescription] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial }) => {
+  const isEditing = initial !== undefined;
+  const [type, setType] = useState<TransactionType>(initial?.type ?? 'expense');
+  const [amountStr, setAmountStr] = useState(initial ? String(initial.amount) : '0');
+  const [selectedCat, setSelectedCat] = useState(initial?.categoryName ?? '식비');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [date, setDate] = useState(initial?.date ?? new Date().toISOString().split('T')[0]);
+
+  // 카테고리 목록이 수입/지출로 갈린다. 종류를 바꿨는데 이전 선택이 새 목록에 없으면
+  // `<select>` 는 첫 항목을 보여주지만 state 는 옛 이름을 들고 있다 — 그대로 저장하면
+  // 화면과 다른 카테고리가 붙는다. 그래서 여기서 첫 항목으로 맞춰준다.
+  const changeType = (next: TransactionType) => {
+    setType(next);
+    const list = DEFAULT_CATEGORIES.filter(c => c.type === next);
+    if (!list.some(c => c.name === selectedCat)) setSelectedCat(list[0].name);
+  };
 
   const handleKeyPress = (key: string) => {
     if (key === 'back') { setAmountStr((prev) => prev.length > 1 ? prev.slice(0, -1) : '0'); return; }
@@ -40,11 +61,14 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave }) => {
       <div className="flex justify-center pt-3 pb-1">
         <div className="w-12 h-1 bg-slate-200 dark:bg-slate-700 rounded-full" />
       </div>
+      <p className="text-center text-sm font-bold text-slate-700 dark:text-slate-200 pb-1">
+        {isEditing ? '내역 수정' : '내역 추가'}
+      </p>
 
       <div className="p-4 flex flex-col gap-4 overflow-y-auto no-scrollbar flex-1">
         <div className="flex gap-3">
-          <button onClick={() => setType('expense')} className={cn("flex-1 py-4 border-2 rounded-2xl font-bold transition-all", type === 'expense' ? "border-rose-200 bg-rose-50 text-rose-500 dark:bg-rose-500/10 dark:border-rose-500/30" : "border-slate-100 dark:border-slate-800 text-slate-400")}>지출</button>
-          <button onClick={() => setType('income')} className={cn("flex-1 py-4 border-2 rounded-2xl font-bold transition-all", type === 'income' ? "border-indigo-200 bg-indigo-50 text-indigo-600 dark:bg-indigo-600/10 dark:border-indigo-600/30" : "border-slate-100 dark:border-slate-800 text-slate-400")}>수입</button>
+          <button onClick={() => changeType('expense')} className={cn("flex-1 py-4 border-2 rounded-2xl font-bold transition-all", type === 'expense' ? "border-rose-200 bg-rose-50 text-rose-500 dark:bg-rose-500/10 dark:border-rose-500/30" : "border-slate-100 dark:border-slate-800 text-slate-400")}>지출</button>
+          <button onClick={() => changeType('income')} className={cn("flex-1 py-4 border-2 rounded-2xl font-bold transition-all", type === 'income' ? "border-indigo-200 bg-indigo-50 text-indigo-600 dark:bg-indigo-600/10 dark:border-indigo-600/30" : "border-slate-100 dark:border-slate-800 text-slate-400")}>수입</button>
         </div>
 
         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-6 flex flex-col gap-1 text-right">
