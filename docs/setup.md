@@ -84,14 +84,36 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ## 백엔드
 | 변수 | 기본값 | 비고 |
 |---|---|---|
-| `JWT_SECRET` | `change-this-secret-in-production` | ⚠️ 기본값으로도 서버가 뜬다 |
-| `ADMIN_KEY` | `change-this-admin-key` | ⚠️ 동일 |
-| `ALLOWED_ORIGINS` | `*` | ⚠️ 임의 origin 허용 |
+| `APP_ENV` | `development` | `production` 이면 아래 세 개가 기본값일 때 **기동을 거부한다** |
+| `JWT_SECRET` | `change-this-secret-in-production` | 개발에선 경고만, 프로덕션이면 거부 |
+| `ADMIN_KEY` | `change-this-admin-key` | 동일 |
+| `ALLOWED_ORIGINS` | `http://localhost:3000` | `*` 는 프로덕션에서 거부 |
 | `DATABASE_URL` | `sqlite:///./data/ledger.db` | |
 | `TOKEN_EXPIRE_DAYS` | `30` | 쿠키 수명(30일 하드코딩)과 어긋날 수 있다 |
 | `SQL_ECHO` | `false` | 쿼리 로깅 |
 
-⚠️ 표시는 전부 [결함 목록](known-issues.md)에 항목이 있다.
+## 기동 시 설정 검증
+
+`app/config.py` 의 `verify_startup_config()` 가 `lifespan` 맨 앞에서 한 번 돈다.
+
+- **개발(`APP_ENV` 미설정 또는 `development`)** — 기본값이어도 뜨지만 경고 로그가 남는다
+- **프로덕션(`APP_ENV=production`)** — 기본값이 하나라도 남아 있으면 `RuntimeError` 로 기동을 멈춘다
+
+```
+RuntimeError: APP_ENV=production 인데 안전하지 않은 설정이 남아 있어 기동을 멈춘다.
+  - JWT_SECRET 이 기본값 그대로다 — 누구나 임의의 사용자 토큰을 위조할 수 있다
+  - ADMIN_KEY 가 기본값 그대로다 — ...
+```
+
+배포용 값 만들기:
+
+```bash
+JWT_SECRET=$(openssl rand -hex 32) ADMIN_KEY=$(openssl rand -hex 32) \
+  ALLOWED_ORIGINS=https://ledger.example.com APP_ENV=production \
+  docker compose up -d --build
+```
+
+→ [#10](https://github.com/s2ngK/claude-asset-man/issues/10) · [#12](https://github.com/s2ngK/claude-asset-man/issues/12)
 
 # 테스트
 
@@ -114,8 +136,11 @@ cd backend && uv run pytest
 # Docker
 
 ```bash
-JWT_SECRET=... ADMIN_KEY=... docker compose up --build
+docker compose up --build            # 개발 — 기본값으로 뜨고 경고가 남는다
 ```
+
+배포는 `.env` 를 채우거나 환경변수를 직접 준다 (위 "기동 시 설정 검증" 참고).
+`APP_ENV=production` 인데 값이 비면 **컨테이너가 뜨지 않는다.**
 
 백엔드 :8000, 프론트엔드 :3000. 백엔드가 healthy 가 된 뒤 프론트엔드가 뜬다.
 백엔드는 시작 시 `alembic upgrade head` 를 자동 실행하고, DB 는 `backend/data/ledger.db` 에
