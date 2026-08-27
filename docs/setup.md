@@ -79,7 +79,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 > [!IMPORTANT] `NEXT_PUBLIC_*`은 빌드 시점에 번들로 인라인된다
 > 런타임에 바꿀 수 없다. 컨테이너 `environment`로 넣어도 **아무 효과가 없다.**
-> Docker에서는 반드시 `build.args`로 넘겨야 한다 → [결함 목록](known-issues.md) 결함 05
+> Docker에서는 반드시 `build.args`로 넘겨야 한다 → [#9](https://github.com/s2ngK/claude-asset-man/issues/9) · [결함 목록](known-issues.md)
 
 ## 백엔드
 | 변수 | 기본값 | 비고 |
@@ -107,7 +107,7 @@ cd backend && uv run pytest
 | `auth.py` | 6 | 로그인 성공/실패, 토큰 검증, rate limit |
 | `transactions.py` | 4 | CRUD, 없는 카테고리 거부, 그룹 스코핑 |
 | `admin.py` | 5 | 헤더 인증, 구 방식 거부, 브루트포스 rate limit |
-| `stats.py` | **0** | → [결함 목록](known-issues.md) 결함 09 |
+| `stats.py` | **0** | → [#13](https://github.com/s2ngK/claude-asset-man/issues/13) · [결함 목록](known-issues.md) |
 | `categories.py` | **0** | |
 | 프론트엔드 | **0** | 의도적 보류 |
 
@@ -120,7 +120,7 @@ docker compose up --build
 > [!CAUTION] 현재 프론트엔드 빌드가 실패한다
 > `Dockerfile.frontend`가 `.next/standalone`을 복사하는데, `next.config.ts`에
 > `output: "standalone"`이 없어서 그 디렉터리가 생성되지 않는다.
-> → [결함 목록](known-issues.md) 결함 04. 고쳐지기 전까지는 위의 로컬 방식을 쓴다.
+> → [#8](https://github.com/s2ngK/claude-asset-man/issues/8) · [결함 목록](known-issues.md). 고쳐지기 전까지는 위의 로컬 방식을 쓴다.
 
 백엔드 컨테이너는 정상이다. 시작 시 `alembic upgrade head`를 자동 실행하고,
 DB는 `backend/data/ledger.db`에 bind mount로 남는다.

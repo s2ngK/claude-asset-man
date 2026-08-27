@@ -53,7 +53,7 @@ erDiagram
 - 시작 시 `seed.py`가 10개를 심는다. **이미 카테고리가 하나라도 있으면 시딩을 건너뛴다**
 - 조회 시 `group_id IS NULL OR group_id = 내 그룹`으로 필터한다 (`routes/categories.py`)
 - 그룹 전용 카테고리를 만드는 기능은 **아직 없다.** API에 카테고리 생성 엔드포인트가 없다
-- 이 기능을 추가할 때 반드시 [결함 목록](known-issues.md)의 결함 01을 먼저 고쳐야 한다
+- 이 기능을 추가할 때 반드시 [결함 목록](known-issues.md)의 [#5](https://github.com/s2ngK/claude-asset-man/issues/5)을 먼저 고쳐야 한다
 
 ## 시스템 기본 카테고리 10개
 `backend/app/seed.py` 기준.
@@ -70,7 +70,7 @@ erDiagram
 
 - ISO `YYYY-MM-DD`는 **사전순 정렬이 곧 날짜순**이라 `ORDER BY date`가 그대로 동작한다
 - 월 필터가 `date.startswith("2026-08")` 한 줄로 끝난다
-- 대신 **DB 레벨 형식 검증이 없다.** 아무 문자열이나 들어간다 → [결함 목록](known-issues.md) 결함 02
+- 대신 **DB 레벨 형식 검증이 없다.** 아무 문자열이나 들어간다 → [#6](https://github.com/s2ngK/claude-asset-man/issues/6) · [결함 목록](known-issues.md)
 
 ## `type`도 그냥 `String`이다
 - CHECK 제약도 Enum도 없다. `'income'` / `'expense'`는 순전히 관례

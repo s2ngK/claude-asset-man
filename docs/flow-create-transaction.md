@@ -61,8 +61,8 @@ sequenceDiagram
 - 저장 후 `joinedload`로 카테고리·사용자를 붙여 평평한 응답을 만든다
 
 ⚠️ 여기서 두 가지가 검증되지 않는다:
-- **카테고리의 그룹 소유권** → [결함 목록](known-issues.md) 결함 01
-- **`type`·`amount`·`date` 값** → 결함 02
+- **카테고리의 그룹 소유권** → [#5](https://github.com/s2ngK/claude-asset-man/issues/5) · [결함 목록](known-issues.md)
+- **`type`·`amount`·`date` 값** → [#6](https://github.com/s2ngK/claude-asset-man/issues/6)
 
 # 저장 후
 
@@ -79,4 +79,4 @@ sequenceDiagram
    - `constants.ts` ↔ `seed.py` 결합이 끊어진다
 2. `DEFAULT_CATEGORIES`는 서버 응답이 오기 전 **초기 렌더용 폴백**으로만 남긴다
 
-→ [결함 목록](known-issues.md) 결함 13
+→ [#17](https://github.com/s2ngK/claude-asset-man/issues/17) · [결함 목록](known-issues.md)

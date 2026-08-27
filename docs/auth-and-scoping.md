@@ -30,7 +30,7 @@ exp       만료 (TOKEN_EXPIRE_DAYS, 기본 30일)
 > [!CAUTION] 기본 시크릿으로도 서버가 그냥 뜬다
 > `JWT_SECRET`, `ADMIN_KEY`는 값이 없으면 `"change-this-secret-in-production"` 같은 기본값으로 떨어지고 경고도 없다.
 > 환경변수를 빠뜨린 채 배포하면 **공개된 문자열로 서명된 JWT**를 쓰게 되고 누구나 토큰을 위조할 수 있다.
-> → [결함 목록](known-issues.md) 결함 08
+> → [#12](https://github.com/s2ngK/claude-asset-man/issues/12) · [결함 목록](known-issues.md)
 
 # 그룹 격리 — 지켜야 할 불변식
 
@@ -65,7 +65,7 @@ tx = db.query(models.Transaction).filter(
 
 - 지금은 모든 카테고리가 시스템 기본값이라 실질 피해가 없다
 - **그룹 전용 카테고리 기능을 붙이는 순간 실제 유출이 된다**
-- → [결함 목록](known-issues.md) 결함 01
+- → [#5](https://github.com/s2ngK/claude-asset-man/issues/5) · [결함 목록](known-issues.md)
 
 # 프론트엔드 쪽 인증
 
@@ -86,7 +86,7 @@ tx = db.query(models.Transaction).filter(
 
 그러면 `proxy.ts`는 통과시키고 → 화면은 열리고 → 모든 API 호출이 401이 된다. 그런데 `request()`가 401을 **처리하지 않아서** 토큰도 안 지우고 로그인으로 보내지도 않는다. 사용자는 빈 화면과 "아직 내역이 없습니다"만 보게 된다.
 
-→ [결함 목록](known-issues.md) 결함 07
+→ [#11](https://github.com/s2ngK/claude-asset-man/issues/11) · [결함 목록](known-issues.md)
 
 # rate limit과 `Depends`의 함정
 

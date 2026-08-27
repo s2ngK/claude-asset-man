@@ -25,7 +25,7 @@ balance = income - expense
 ```
 
 지금은 그 달 거래를 **전부** 받아오므로 결과가 서버 계산과 같다.
-⚠️ **페이지네이션을 넣는 순간 화면의 합계가 조용히 틀려진다.** → [결함 목록](known-issues.md) 결함 10
+⚠️ **페이지네이션을 넣는 순간 화면의 합계가 조용히 틀려진다.** → [#14](https://github.com/s2ngK/claude-asset-man/issues/14) · [결함 목록](known-issues.md)
 
 # 집계 규칙
 
@@ -72,7 +72,7 @@ percentage = round(r.total / total * 100, 1)
 
 # ⚠️ 잘못된 `type`은 조용히 증발한다
 
-집계는 `type == 'income'` 또는 `'expense'`인 행만 센다. 그런데 `type`에 **검증이 없다** → [결함 목록](known-issues.md) 결함 02
+집계는 `type == 'income'` 또는 `'expense'`인 행만 센다. 그런데 `type`에 **검증이 없다** → [#6](https://github.com/s2ngK/claude-asset-man/issues/6) · [결함 목록](known-issues.md)
 
 ```
 type='바나나'로 거래 생성 → HTTP 201, 저장됨
@@ -88,10 +88,10 @@ Pydantic에서 `type: Literal["income","expense"]`로 막는 것이 근본 해�
 
 `GET /stats/trend`가 **월마다 쿼리를 따로 날린다** (6개월 = 6회).
 
-SQLite의 `strftime`으로 월을 뽑아 `GROUP BY` 한 번에 끝낼 수 있다. 현재 규모에선 체감되지 않지만, 통계 테스트를 붙일 때 같이 정리하면 좋다. → [결함 목록](known-issues.md) 결함 11
+SQLite의 `strftime`으로 월을 뽑아 `GROUP BY` 한 번에 끝낼 수 있다. 현재 규모에선 체감되지 않지만, 통계 테스트를 붙일 때 같이 정리하면 좋다. → [#15](https://github.com/s2ngK/claude-asset-man/issues/15) · [결함 목록](known-issues.md)
 
 # 테스트가 없다
 
 `stats.py`는 **백엔드에서 가장 큰 파일(132줄)인데 테스트가 0개다.** 집계·정렬·퍼센트처럼 조용히 틀리기 쉬운 로직이 전부 여기 있는데도 그렇다.
 
-`backend/tests/conftest.py`에 in-memory SQLite 픽스처가 이미 있으니 그대로 쓰면 된다. → [결함 목록](known-issues.md) 결함 09
+`backend/tests/conftest.py`에 in-memory SQLite 픽스처가 이미 있으니 그대로 쓰면 된다. → [#13](https://github.com/s2ngK/claude-asset-man/issues/13) · [결함 목록](known-issues.md)

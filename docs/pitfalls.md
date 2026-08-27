@@ -59,7 +59,7 @@ CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --
 
 ## `NEXT_PUBLIC_*`은 런타임 환경변수가 아니다
 
-빌드 시점에 번들로 **인라인**된다. docker-compose의 `environment:`로 넣으면 아무 효과가 없다. `build.args`로 넘겨야 한다. → [결함 목록](known-issues.md) 결함 05
+빌드 시점에 번들로 **인라인**된다. docker-compose의 `environment:`로 넣으면 아무 효과가 없다. `build.args`로 넘겨야 한다. → [#9](https://github.com/s2ngK/claude-asset-man/issues/9) · [결함 목록](known-issues.md)
 
 # Next.js 16 마이그레이션
 
@@ -106,7 +106,7 @@ Material Symbols Outlined를 `next/font`로 옮기려 했으나 **불가능**했
 
 ## `ALLOWED_ORIGINS` 기본값이 `*`다
 
-직접 `uvicorn`으로 띄우면 기본값이 그대로 적용되고, `allow_credentials=True`와 함께라서 **임의 origin을 echo back** 한다. docker-compose는 값을 명시하므로 안전하다. → [결함 목록](known-issues.md) 결함 06
+직접 `uvicorn`으로 띄우면 기본값이 그대로 적용되고, `allow_credentials=True`와 함께라서 **임의 origin을 echo back** 한다. docker-compose는 값을 명시하므로 안전하다. → [#10](https://github.com/s2ngK/claude-asset-man/issues/10) · [결함 목록](known-issues.md)
 
 # 스키마 변경
 
