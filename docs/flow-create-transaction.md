@@ -2,7 +2,7 @@
 
 ← [그룹 가계부](README.md) · 관련 [목록 정렬과 필터](flow-list-sort-filter.md) [엔드포인트별 규칙](api-rules.md) [데이터 모델](data-model.md)
 
-거래 하나가 저장될 때까지의 경로. **이름 기반 카테고리 매칭**이라는 함정이 여기 있다.
+거래 하나가 저장될 때까지의 경로. 카테고리는 **id 로** 오간다.
 추가와 수정은 **같은 모달·같은 경로**를 쓴다.
 
 # 흐름
@@ -14,12 +14,12 @@ sequenceDiagram
     participant A as api.ts
     participant S as 백엔드
 
-    M->>M: DEFAULT_CATEGORIES에서<br/>type으로 필터해 select 구성
-    M->>V: onSave(amount, 카테고리 "이름", desc, type, date)
-    V->>A: getCategories()
+    V->>A: getCategories() (화면 진입 시 1회)
     A->>S: GET /api/categories
     S-->>V: 서버 카테고리 목록 (id 포함)
-    V->>V: name + type이 같은 것을 찾아 id 획득
+    V->>M: categories 전달
+    M->>M: type으로 필터해 select 구성
+    M->>V: onSave(amount, category_id, desc, type, date)
     alt 추가 (editing === null)
         V->>A: createTransaction({category_id, ...})
         A->>S: POST /api/transactions
@@ -32,8 +32,8 @@ sequenceDiagram
     V->>V: fetchTransactions() 재조회
 ```
 
-`getCategories()` 는 `MainView` 가 **마운트 때 한 번 받아 state 에 들고 있다.** 저장할 때는
-그 목록을 쓰고, 비어 있을 때만 그 자리에서 받아온다.
+`getCategories()` 는 `MainView` 가 **마운트 때 한 번** 받아 state 에 들고, 그대로 모달에
+넘긴다. 저장할 때 나가는 추가 요청은 없다.
 
 # 추가와 수정은 같은 모달이다
 
@@ -108,33 +108,41 @@ sequenceDiagram
 그대로 저장하면 화면과 다른 카테고리가 붙는다. 그래서 종류를 바꿀 때 현재 선택이 새 목록에
 없으면 첫 항목으로 맞춘다.
 
-# 핵심: 모달은 이름만 넘긴다
+# 모달은 `category_id` 를 넘긴다
 
-`AddEntryModal`은 `category_id`를 모른다. `src/lib/constants.ts`의 `DEFAULT_CATEGORIES`로 select를 그리기 때문에 **로컬 상수의 이름 문자열**만 갖고 있다.
+`AddEntryModal` 은 **서버 카테고리 목록을 그대로 받아** select 를 그리고, 고른 것의 `id` 를
+`onSave` 로 돌려준다. `MainView` 는 그 값을 그대로 payload 에 넣는다 — 찾아볼 것이 없다.
 
-그래서 `MainView.handleSaveEntry`가 저장할 때마다:
-1. 마운트 때 받아둔 **서버 카테고리 목록**을 쓴다 (비어 있으면 그 자리에서 `getCategories()`)
-2. `name`과 `type`이 모두 일치하는 것을 찾는다
-3. 못 찾으면 `name`만으로 한 번 더 찾는다 (fallback)
-4. 그래도 없으면 에러
+> [!NOTE] 예전에는 이름으로 찾았다
+> 모달이 `src/lib/constants.ts` 의 `DEFAULT_CATEGORIES` 로 select 를 그렸기 때문에
+> **이름 문자열**만 갖고 있었고, 저장할 때마다 서버 목록에서 `name + type` 이 같은 것을
+> 찾아 id 를 얻었다. 그래서 `constants.ts` 와 `backend/app/seed.py` 의 이름·타입이
+> **정확히 일치해야만** 저장이 됐고, 그 결합을 강제하는 장치는 코드 어디에도 없었다.
+> 실제로 프론트 `DEFAULT_CATEGORIES` 에 `type` 이 없어 카테고리 select 가 통째로 비었던
+> 적이 있다 → [#17](https://github.com/s2ngK/claude-asset-man/issues/17)
 
-> [!WARNING] 두 파일이 조용히 결합돼 있다
-> `src/lib/constants.ts`의 `DEFAULT_CATEGORIES`와 `backend/app/seed.py`의 시딩 목록이
-> **이름·타입이 정확히 일치해야만** 저장이 된다. 한쪽만 고치면 즉시 깨진다.
-> 코드 어디에도 이 결합을 강제하는 장치가 없다.
+## 목록이 오기 전에는 저장할 수 없다
 
-## 실제로 터졌던 사례
-프론트 `DEFAULT_CATEGORIES`에 `type` 필드 자체가 없던 시기가 있었다. 그래서
-`DEFAULT_CATEGORIES.filter(c => c.type === type)`가 **항상 빈 배열**을 반환했고,
-거래 추가 모달의 카테고리 select가 통째로 비어 있었다. 타입 에러로도 잡혔지만
-`npm run build`가 애초에 깨져 있어서 한동안 아무도 몰랐다.
+`DEFAULT_CATEGORIES` 의 id 는 `food`, `salary` 같은 **로컬 문자열이라 서버 id 가 아니다.**
+그대로 보내면 404 다. 그래서 서버 목록이 비어 있는 동안에는 select 를 비활성으로 두고
+[완료] 도 막는다. `DEFAULT_CATEGORIES` 는 그 사이 이름을 보여주는 용도로만 남는다.
 
-지금은 `type`이 들어갔고 양쪽 10개가 일치하는 것을 실제 서버로 확인했다.
+## 기본 선택은 이름을 힌트로만 쓴다
 
-## 왜 `기타`가 두 개인가
-시스템 카테고리에 `기타`가 **expense와 income 양쪽에** 있다 → [데이터 모델](data-model.md)
+서버 목록은 이름순이라 그대로 첫 항목을 쓰면 지출 기본값이 `교통` 이 된다. 예전 기본값
+(지출 `식비`, 수입 `급여`)을 유지하려고 `DEFAULT_CATEGORIES` 의 첫 항목 **이름**을 찾아
+쓰고, 못 찾으면 목록의 첫 항목으로 떨어진다. 못 찾아도 저장은 정상이므로 이건
+결합이 아니라 취향이다.
 
-그래서 이름만으로 찾으면 안 되고 반드시 `name + type`이어야 한다. 3번의 fallback(이름만으로 재검색)은 이 경우 잘못된 것을 집을 수 있다.
+## 종류를 바꾸면 카테고리도 따라간다
+
+카테고리 목록은 `type` 으로 갈린다. 지출에서 `식비` 를 고른 채 수입으로 바꾸면 `식비` 는
+새 목록에 없다. **state 를 고쳐 맞추는 대신 읽을 때 파생시킨다** — 고른 값이 현재 목록에
+없으면 기본값으로 읽는다. 그러면 화면과 state 가 어긋나는 순간 자체가 없다.
+
+> [!WARNING] `기타` 는 수입·지출 양쪽에 있다
+> 그래서 이름으로 고르면 안 된다 → [데이터 모델](data-model.md). id 로 넘기는 지금은
+> 이 문제가 사라졌다.
 
 # 서버 쪽에서 일어나는 일
 
@@ -155,11 +163,12 @@ sequenceDiagram
 - 그래서 저장이 느리게 느껴질 수 있지만 화면과 서버가 어긋나지 않는다
 - 실패하면 `alert()`로 메시지를 띄운다
 
-# 개선한다면
+# 남은 결합
 
-1. **모달이 `category_id`를 넘기게 한다.** `MainView` 가 목록을 캐시하면서 저장할 때마다
-   나가던 요청은 없앴지만, **`constants.ts` ↔ `seed.py` 이름 결합은 그대로 남아 있다.**
-   모달이 서버 카테고리를 직접 받아 id 를 넘기면 그 결합이 끊어진다
-2. `DEFAULT_CATEGORIES`는 서버 응답이 오기 전 **초기 렌더용 폴백**으로만 남긴다
+`DEFAULT_CATEGORIES` 는 이제 **저장 경로에 없다.** 남은 쓰임은 두 가지뿐이다.
 
-→ [#17](https://github.com/s2ngK/claude-asset-man/issues/17) · [결함 목록](known-issues.md)
+- 서버 목록이 오기 전 select 에 이름을 채우는 것
+- `TransactionItem` 이 아이콘·색을 못 받았을 때의 폴백
+
+둘 다 틀려도 저장은 되고 데이터도 안 어긋난다. `seed.py` 와 이름이 달라지면 잠깐 어색한
+이름이 보일 뿐이다.

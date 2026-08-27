@@ -126,11 +126,12 @@ cd backend && uv run pytest
 
 | 대상 | 테스트 | 덮인 것 |
 |---|---|---|
-| `auth.py` | 6 | 로그인 성공/실패, 토큰 검증, rate limit |
+| `auth.py` | 8 | 로그인 성공/실패, 토큰 검증, 만료 시각, rate limit |
 | `transactions.py` | 4 | CRUD, 없는 카테고리 거부, 그룹 스코핑 |
 | `admin.py` | 5 | 헤더 인증, 구 방식 거부, 브루트포스 rate limit |
-| `stats.py` | **0** | → [#13](https://github.com/s2ngK/claude-asset-man/issues/13) · [결함 목록](known-issues.md) |
-| `categories.py` | **0** | |
+| `config.py` | 9 | 기본 시크릿 탐지, 프로덕션 기동 거부 |
+| `stats.py` | 16 | 그룹/개인 집계, 지출만 세기, 퍼센트·정렬, 추이 6개월 창 |
+| `categories.py` | 5 | 시스템 기본값, 자기 그룹 전용, 다른 그룹 격리, 정렬 |
 | 프론트엔드 | **0** | 의도적 보류 |
 
 # Docker

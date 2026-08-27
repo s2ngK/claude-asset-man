@@ -10,10 +10,12 @@ import { Transaction, TransactionType } from '@/types';
 import { cn, getErrorMessage } from '@/lib/utils';
 import {
   getTransactions, createTransaction, updateTransaction, deleteTransaction,
-  getCategories, getLocalUser,
+  getCategories, getSummary,
   type Transaction as ApiTransaction,
   type Category as ApiCategory,
+  type MonthlySummary,
 } from '@/lib/api';
+import { useLocalUser } from '@/lib/useLocalUser';
 
 type SortOrder = 'newest' | 'oldest';
 type TypeFilter = 'all' | TransactionType;
@@ -48,8 +50,11 @@ export default function MainView() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all'); // category_id 또는 'all'
+  // 이 달 전체 합계는 **서버가 낸 값**이다. 목록을 reduce 하면 지금은 같은 값이 나오지만,
+  // 페이지네이션을 넣는 순간 화면에 있는 것만 더하게 되어 조용히 틀려진다 (#14).
+  const [monthSummary, setMonthSummary] = useState<MonthlySummary>({ income: 0, expense: 0, balance: 0 });
 
-  const user = getLocalUser();
+  const user = useLocalUser();
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -63,26 +68,33 @@ export default function MainView() {
     }
   }, [currentMonth]);
 
+  const fetchSummary = useCallback(async () => {
+    try {
+      setMonthSummary(await getSummary(currentMonth));
+    } catch (err) {
+      console.error('summary fetch error', err);
+    }
+  }, [currentMonth]);
+
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+  useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
   // 필터 드롭다운과 저장 시 이름→id 매칭에 함께 쓴다. 한 번만 받아둔다.
   useEffect(() => {
     getCategories().then(setCategories).catch(err => console.error('category fetch error', err));
   }, []);
 
-  const handleSaveEntry = async (amount: number, categoryName: string, desc: string, type: TransactionType, date: string) => {
+  const handleSaveEntry = async (amount: number, categoryId: string, desc: string, type: TransactionType, date: string) => {
     try {
-      const cats = categories.length ? categories : await getCategories();
-      const cat = cats.find(c => c.name === categoryName && c.type === type) ?? cats.find(c => c.name === categoryName);
-      if (!cat) throw new Error(`카테고리를 찾을 수 없습니다: ${categoryName}`);
-      const payload = { category_id: cat.id, type, amount, description: desc, date };
+      // 모달이 서버 카테고리 id 를 그대로 준다 — 이름으로 되찾을 일이 없다 (#17).
+      const payload = { category_id: categoryId, type, amount, description: desc, date };
       // editing 은 모달이 닫히기 전에 읽힌다 (onSave → onClose 순서).
       if (editing) {
         await updateTransaction(editing.id, payload);
       } else {
         await createTransaction(payload);
       }
-      await fetchTransactions();
+      await Promise.all([fetchTransactions(), fetchSummary()]);
     } catch (err) {
       alert('저장 실패: ' + getErrorMessage(err, '알 수 없는 오류'));
     }
@@ -115,6 +127,7 @@ export default function MainView() {
     }
     setDeletedItem({ item, index });
     setShowUndo(true);
+    fetchSummary(); // 목록은 낙관적으로 지웠지만 합계는 서버가 낸다
   };
 
   // 되돌리기는 취소가 아니라 같은 내용으로 다시 만드는 것이다.
@@ -135,7 +148,7 @@ export default function MainView() {
     } catch (err) {
       alert('되돌리기 실패: ' + getErrorMessage(err, '알 수 없는 오류'));
     }
-    await fetchTransactions();
+    await Promise.all([fetchTransactions(), fetchSummary()]);
   };
 
   const filterActive = typeFilter !== 'all' || categoryFilter !== 'all';
@@ -181,10 +194,8 @@ export default function MainView() {
     return { income, expense, balance: income - expense };
   };
 
-  // 요약 카드는 **필터와 무관하게 그 달 전체**를 보여준다. 기준점이 필터마다 흔들리면
-  // (수입만 보면 지출이 0 으로 떨어진다) 무엇과 비교하는 숫자인지 알 수 없다.
-  const summary = useMemo(() => totals(transactions), [transactions]);
-  // 대신 "지금 걸러낸 것들의 합" 은 목록 바로 위 한 줄로 따로 말해준다.
+  // "지금 걸러낸 것들의 합" 은 화면에 보이는 것에 대한 이야기라 여기서 센다.
+  // (그 달 전체 합계인 monthSummary 와 달리 서버에 물어볼 것이 아니다.)
   const filteredSummary = useMemo(() => totals(visibleTransactions), [visibleTransactions]);
 
   return (
@@ -218,18 +229,18 @@ export default function MainView() {
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">이번 달 잔액</p>
             <p className="text-slate-900 dark:text-white tracking-tight text-3xl font-bold">
-              {new Intl.NumberFormat('ko-KR').format(summary.balance)}원
+              {new Intl.NumberFormat('ko-KR').format(monthSummary.balance)}원
             </p>
           </div>
           <div className="h-[1px] bg-slate-100 dark:bg-slate-800 w-full" />
           <div className="flex justify-between gap-4">
             <div>
               <p className="text-slate-500 dark:text-slate-400 text-[10px] font-medium uppercase tracking-wider">수입</p>
-              <p className="text-emerald-500 text-lg font-bold">{new Intl.NumberFormat('ko-KR').format(summary.income)}</p>
+              <p className="text-emerald-500 text-lg font-bold">{new Intl.NumberFormat('ko-KR').format(monthSummary.income)}</p>
             </div>
             <div className="text-right">
               <p className="text-slate-500 dark:text-slate-400 text-[10px] font-medium uppercase tracking-wider">지출</p>
-              <p className="text-rose-500 text-lg font-bold">{new Intl.NumberFormat('ko-KR').format(summary.expense)}</p>
+              <p className="text-rose-500 text-lg font-bold">{new Intl.NumberFormat('ko-KR').format(monthSummary.expense)}</p>
             </div>
           </div>
         </div>
@@ -328,9 +339,10 @@ export default function MainView() {
         <AddEntryModal
           onClose={() => { setIsAddEntryOpen(false); setEditing(null); }}
           onSave={handleSaveEntry}
+          categories={categories}
           initial={editing ? {
             amount: editing.amount,
-            categoryName: editing.categories?.name ?? '기타',
+            categoryId: editing.category_id,
             description: editing.description,
             type: editing.type,
             date: editing.date,

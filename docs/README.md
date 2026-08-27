@@ -24,7 +24,7 @@
 - [엔드포인트별 규칙](api-rules.md) — OpenAPI가 표현 못 하는 의미론
 
 ## 동작
-- [거래 등록·수정 흐름](flow-create-transaction.md) — 이름 기반 카테고리 매칭이라는 함정
+- [거래 등록·수정 흐름](flow-create-transaction.md) — 카테고리 id 가 어디서 와서 어디로 가는가
 - [목록 정렬과 필터](flow-list-sort-filter.md) — 전부 클라이언트에서. `created_at` 이 2차 정렬 키인 이유
 - [삭제와 되돌리기](flow-delete-undo.md) — 즉시 삭제 + 재생성 방식 되돌리기
 - [통계 집계 규칙](stats-rules.md) — 무엇이 집계에 잡히고 무엇이 빠지는가

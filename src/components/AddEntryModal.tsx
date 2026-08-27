@@ -4,29 +4,34 @@ import React, { useState } from 'react';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { TransactionType } from '@/types';
 import { cn } from '@/lib/utils';
+import type { Category as ApiCategory } from '@/lib/api';
 import { Button } from './ui/button';
 
 interface AddEntryModalProps {
   onClose: () => void;
-  onSave: (amount: number, categoryName: string, description: string, type: TransactionType, date: string) => void;
+  /** 카테고리는 **id 로** 넘긴다. 이름으로 넘기면 서버에서 다시 찾아야 하고, `기타` 처럼
+   *  수입·지출 양쪽에 있는 이름은 엉뚱한 것을 집을 수 있다 (#17). */
+  onSave: (amount: number, categoryId: string, description: string, type: TransactionType, date: string) => void;
+  /** 서버 카테고리 목록. **id 의 유일한 출처다.** 아직 못 받았으면 저장을 막는다. */
+  categories: ApiCategory[];
   /**
    * 있으면 **수정 모드**다. 폼을 이 값으로 채우고 문구만 바꾼다.
    * 만들기냐 고치기냐의 판단은 `MainView` 가 한다 — 이 컴포넌트는 값만 모아 돌려준다.
    */
   initial?: {
     amount: number;
-    categoryName: string;
+    categoryId: string;
     description: string;
     type: TransactionType;
     date: string;
   };
 }
 
-const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial }) => {
+const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categories, initial }) => {
   const isEditing = initial !== undefined;
   const [type, setType] = useState<TransactionType>(initial?.type ?? 'expense');
   const [amountStr, setAmountStr] = useState(initial ? String(initial.amount) : '0');
-  const [selectedCat, setSelectedCat] = useState(initial?.categoryName ?? '식비');
+  const [pickedCatId, setPickedCatId] = useState(initial?.categoryId ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().split('T')[0]);
   // +/- 를 누르면 지금까지의 값이 여기로 확정되고, 키패드는 다음 피연산자를 받는다.
@@ -43,14 +48,22 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
   const showsPlaceholder = isEditing && pending === null && amountStr === '0';
   const amountToSave = showsPlaceholder ? initial.amount : evaluated;
 
-  // 카테고리 목록이 수입/지출로 갈린다. 종류를 바꿨는데 이전 선택이 새 목록에 없으면
-  // `<select>` 는 첫 항목을 보여주지만 state 는 옛 이름을 들고 있다 — 그대로 저장하면
-  // 화면과 다른 카테고리가 붙는다. 그래서 여기서 첫 항목으로 맞춰준다.
-  const changeType = (next: TransactionType) => {
-    setType(next);
-    const list = DEFAULT_CATEGORIES.filter(c => c.type === next);
-    if (!list.some(c => c.name === selectedCat)) setSelectedCat(list[0].name);
-  };
+  // 서버 목록이 오기 전에는 저장할 수 없다 — 로컬 상수의 id 는 서버 id 가 아니다.
+  const categoriesReady = categories.length > 0;
+  const options = categoriesReady
+    ? categories.filter(c => c.type === type)
+    : DEFAULT_CATEGORIES.filter(c => c.type === type); // 첫 페인트용 이름 표시만
+
+  // 아무것도 안 골랐을 때의 기본값. 서버 목록은 이름순이라 그대로 첫 항목을 쓰면 지출이
+  // `교통` 으로 바뀐다 — 예전 기본값(지출 `식비`, 수입 `급여`)을 유지하려고
+  // DEFAULT_CATEGORIES 의 첫 항목을 **이름 힌트로만** 쓴다. 못 찾으면 목록의 첫 항목이다.
+  const preferredName = DEFAULT_CATEGORIES.find(c => c.type === type)?.name;
+  const defaultCatId = options.find(c => c.name === preferredName)?.id ?? options[0]?.id ?? '';
+
+  // 종류가 바뀌면 카테고리 목록도 갈린다. 고른 값이 새 목록에 없으면 `<select>` 는 첫
+  // 항목을 보여주는데 state 만 옛 값이면 화면과 다른 카테고리로 저장된다.
+  // state 를 고쳐 맞추는 대신 **읽을 때 파생시킨다** — 그러면 어긋나는 순간 자체가 없다.
+  const selectedCatId = options.some(c => c.id === pickedCatId) ? pickedCatId : defaultCatId;
 
   const handleKeyPress = (key: string) => {
     if (key === 'back') { setAmountStr((prev) => prev.length > 1 ? prev.slice(0, -1) : '0'); return; }
@@ -68,9 +81,11 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
     });
   };
 
+  const canSave = amountToSave > 0 && categoriesReady && selectedCatId !== '';
+
   const handleDone = () => {
-    if (amountToSave <= 0) return; // 서버 스키마가 amount > 0 을 요구한다
-    onSave(amountToSave, selectedCat, description, type, date);
+    if (!canSave) return; // 금액은 서버 스키마가 > 0 을 요구하고, 카테고리는 id 가 있어야 한다
+    onSave(amountToSave, selectedCatId, description, type, date);
     onClose();
   };
 
@@ -85,8 +100,8 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
 
       <div className="p-4 flex flex-col gap-4 overflow-y-auto no-scrollbar flex-1">
         <div className="flex gap-3">
-          <button onClick={() => changeType('expense')} className={cn("flex-1 py-4 border-2 rounded-2xl font-bold transition-all", type === 'expense' ? "border-rose-200 bg-rose-50 text-rose-500 dark:bg-rose-500/10 dark:border-rose-500/30" : "border-slate-100 dark:border-slate-800 text-slate-400")}>지출</button>
-          <button onClick={() => changeType('income')} className={cn("flex-1 py-4 border-2 rounded-2xl font-bold transition-all", type === 'income' ? "border-indigo-200 bg-indigo-50 text-indigo-600 dark:bg-indigo-600/10 dark:border-indigo-600/30" : "border-slate-100 dark:border-slate-800 text-slate-400")}>수입</button>
+          <button onClick={() => setType('expense')} className={cn("flex-1 py-4 border-2 rounded-2xl font-bold transition-all", type === 'expense' ? "border-rose-200 bg-rose-50 text-rose-500 dark:bg-rose-500/10 dark:border-rose-500/30" : "border-slate-100 dark:border-slate-800 text-slate-400")}>지출</button>
+          <button onClick={() => setType('income')} className={cn("flex-1 py-4 border-2 rounded-2xl font-bold transition-all", type === 'income' ? "border-indigo-200 bg-indigo-50 text-indigo-600 dark:bg-indigo-600/10 dark:border-indigo-600/30" : "border-slate-100 dark:border-slate-800 text-slate-400")}>수입</button>
         </div>
 
         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-6 flex flex-col gap-1 text-right">
@@ -125,10 +140,12 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
           </div>
           <div className="flex-1 flex flex-col gap-2">
             <span className="text-slate-400 text-xs font-bold px-1">카테고리</span>
-            <select value={selectedCat} onChange={(e) => setSelectedCat(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-900 rounded-2xl h-14 px-4 w-full border-none outline-none text-slate-700 dark:text-slate-200 font-medium text-sm appearance-none">
-              {DEFAULT_CATEGORIES.filter(c => c.type === type).map(cat => (
-                <option key={cat.id} value={cat.name}>{cat.name}</option>
+            <select value={categoriesReady ? selectedCatId : ''} disabled={!categoriesReady}
+              onChange={(e) => setPickedCatId(e.target.value)}
+              className="bg-slate-50 dark:bg-slate-900 rounded-2xl h-14 px-4 w-full border-none outline-none text-slate-700 dark:text-slate-200 font-medium text-sm appearance-none disabled:opacity-50">
+              {!categoriesReady && <option value="">불러오는 중…</option>}
+              {options.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
           </div>
@@ -141,7 +158,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
               숫자는 전화기가 아니라 계산기 순서(아래로 갈수록 작아짐)를 따른다. */}
           {['7','8','9','back','4','5','6','+','1','2','3','-','0','00','C','완료'].map(label => (
             <KeypadButton key={label} label={label} onClick={handleKeyPress} onDone={handleDone}
-              disabled={label === '완료' && amountToSave <= 0}
+              disabled={label === '완료' && !canSave}
               variant={label === '완료' ? 'primary' : ['C','back','+','-'].includes(label) ? 'action' : 'number'} />
           ))}
         </div>
