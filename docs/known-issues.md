@@ -21,7 +21,7 @@
 | 이슈 | 심각도 | 내용 | 위치 | 관련 문서 |
 |---|---|---|---|---|
 | [#5](https://github.com/s2ngK/claude-asset-man/issues/5) | 🔴 | 거래 생성 시 **카테고리의 그룹 소유권 미검증** | `routes/transactions.py` | [인증과 그룹 격리](auth-and-scoping.md) |
-| [#6](https://github.com/s2ngK/claude-asset-man/issues/6) | 🔴 | `type`·`amount`·`date` **값 검증 전무** | `schemas.py` | [통계 집계 규칙](stats-rules.md) |
+| ~~[#6](https://github.com/s2ngK/claude-asset-man/issues/6)~~ | ✅ | ~~`type`·`amount`·`date` 값 검증 전무~~ — **해결됨** | `schemas.py` | [통계 집계 규칙](stats-rules.md) |
 | [#7](https://github.com/s2ngK/claude-asset-man/issues/7) | 🔴 | 연속 삭제 시 **먼저 지운 항목이 서버에 남음** | `MainView.tsx` | [삭제와 되돌리기](flow-delete-undo.md) |
 | [#8](https://github.com/s2ngK/claude-asset-man/issues/8) | 🟠 | `docker compose up --build` **프론트 빌드 실패** | `Dockerfile.frontend` | [개발 환경 세팅](setup.md) |
 | [#9](https://github.com/s2ngK/claude-asset-man/issues/9) | 🟠 | docker-compose의 `API_URL`이 **무효** | `docker-compose.yml` | [함정과 교훈](pitfalls.md) |
@@ -46,13 +46,27 @@ A유저가 그 category_id로 거래 생성 → HTTP 201
 ```
 지금은 모든 카테고리가 시스템 기본값이라 실질 피해가 없다. **그룹 전용 카테고리 기능을 붙이는 순간 실제 유출이 된다.**
 
-## [#6](https://github.com/s2ngK/claude-asset-man/issues/6) — 아무 값이나 저장됨
+## [#6](https://github.com/s2ngK/claude-asset-man/issues/6) — 아무 값이나 저장됨 ✅ **해결됨**
+
+리뷰 시점:
 ```
 type='바나나'   → 201, 저장됨
   └ /stats/summary → {income:0, expense:9999}   ← 어디에도 안 잡힘
 amount=-50000  → 201, 저장됨
 date='내일'     → 201, 저장됨
 ```
+
+수정 후 동일 시나리오 재실행:
+```
+type='바나나'      → 422 ✅
+amount=-50000     → 422 ✅
+amount=0          → 422 ✅
+date='내일'        → 422 ✅
+date='2026-13-01' → 422 ✅
+정상 거래 9999원   → 201, /stats/summary 에 집계됨 ✅
+```
+
+PUT 경로도 동일하게 막힌다. 회귀 테스트 7개 추가.
 
 ## [#10](https://github.com/s2ngK/claude-asset-man/issues/10) — 임의 origin echo back
 ```
@@ -72,7 +86,7 @@ Docker 데몬이 꺼져 있어 이미지 빌드 자체는 실행하지 못했다
 
 # 권장 처리 순서
 
-1. **[#6](https://github.com/s2ngK/claude-asset-man/issues/6)** — Pydantic 스키마 한 파일로 구멍 3개가 한 번에 막힌다. 비용 최저, 효과 최대. 회귀 테스트를 같이 넣으면 09의 첫 삽도 된다
+1. ~~**[#6](https://github.com/s2ngK/claude-asset-man/issues/6)**~~ — ✅ **완료.** Pydantic 스키마로 구멍 3개를 한 번에 막고 회귀 테스트 7개 추가. 덤으로 OpenAPI 스펙이 `enum`·`exclusiveMinimum`·`format: date`를 갖게 됐다 → [#13](https://github.com/s2ngK/claude-asset-man/issues/13)의 첫 삽
 2. **[#5](https://github.com/s2ngK/claude-asset-man/issues/5)** — `categories.py`의 필터 조건을 헬퍼로 빼서 재사용
 3. **[#7](https://github.com/s2ngK/claude-asset-man/issues/7)** — 사용자가 실제로 겪는 유일한 데이터 유실 경로
 4. **[#8](https://github.com/s2ngK/claude-asset-man/issues/8) + [#9](https://github.com/s2ngK/claude-asset-man/issues/9)** — 둘 다 한 줄 수정. 고친 뒤 **실제로 `docker compose up --build`를 돌려 확인**하는 것까지가 작업
