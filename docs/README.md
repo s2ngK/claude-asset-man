@@ -25,7 +25,7 @@
 
 ## 동작
 - [거래 등록 흐름](flow-create-transaction.md) — 이름 기반 카테고리 매칭이라는 함정
-- [삭제와 되돌리기](flow-delete-undo.md) — 낙관적 삭제 + 4초 타이머
+- [삭제와 되돌리기](flow-delete-undo.md) — 즉시 삭제 + 재생성 방식 되돌리기
 - [통계 집계 규칙](stats-rules.md) — 무엇이 집계에 잡히고 무엇이 빠지는가
 
 ## 운영
