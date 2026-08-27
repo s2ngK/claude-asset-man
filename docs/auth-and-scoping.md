@@ -60,12 +60,30 @@ tx = db.query(models.Transaction).filter(
 ).first()
 ```
 
-## 지금 뚫려 있는 곳
-거래를 만들 때 **카테고리의 소유권은 검사하지 않는다.** 존재 여부만 본다.
+## 참조하는 ID 도 같은 조건을 통과해야 한다
 
-- 지금은 모든 카테고리가 시스템 기본값이라 실질 피해가 없다
-- **그룹 전용 카테고리 기능을 붙이는 순간 실제 유출이 된다**
-- → [#5](https://github.com/s2ngK/claude-asset-man/issues/5) · [결함 목록](known-issues.md)
+거래가 가리키는 `category_id` 역시 호출자의 그룹이 쓸 수 있는 것이어야 한다.
+**존재 여부만 보면 안 된다** — 다른 그룹 전용 카테고리를 자기 거래에 붙일 수 있고,
+응답의 `category_name` 으로 그 그룹의 카테고리 이름이 새어 나간다 ([#5](https://github.com/s2ngK/claude-asset-man/issues/5)).
+
+조건이 두 군데로 갈라지지 않도록 `app/queries.py` 의 `visible_categories()` 하나로 모았다.
+
+```python
+def visible_categories(db: Session, group_id: str) -> Query[models.Category]:
+    return db.query(models.Category).filter(
+        (models.Category.group_id.is_(None)) | (models.Category.group_id == group_id)
+    )
+```
+
+**목록 조회와 거래 저장이 같은 함수를 본다.** 목록에 안 나오는 카테고리는 붙일 수도 없다.
+
+거래 생성·수정 모두 `_require_usable_category()` 를 거치며, 남의 그룹 카테고리에는
+**403 이 아니라 404** 를 준다 — 거래 조회·삭제와 같은 방침으로, ID 를 넣어보는 것만으로
+존재 여부를 알아낼 수 없게 한다.
+
+> [!IMPORTANT]
+> 앞으로 다른 테이블에도 그룹 전용 행이 생기면 같은 형태를 따른다 —
+> 필터를 `queries.py` 에 함수로 두고, 목록 조회와 참조 검증이 **그 함수 하나를** 쓰게 한다.
 
 # 프론트엔드 쪽 인증
 

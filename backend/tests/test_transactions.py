@@ -146,3 +146,73 @@ def test_valid_transaction_reaches_the_summary(client, auth_headers, category):
     summary = client.get("/api/stats/summary?month=2026-07", headers=auth_headers).json()
     assert summary["expense"] == 9999
     assert summary["balance"] == -9999
+
+
+# ── 카테고리 그룹 소유권 (#5) ─────────────────────────────────────────────────
+# 예전에는 카테고리의 "존재" 여부만 확인해서, 다른 그룹 전용 카테고리 ID 를 알면
+# 자기 거래에 붙일 수 있었다. 응답의 category_name 으로 그 그룹의 카테고리 이름이
+# 그대로 새어 나갔다.
+
+
+def test_create_rejects_other_groups_category(client, auth_headers, other_group_category):
+    res = client.post(
+        "/api/transactions",
+        json=_create_payload(other_group_category),
+        headers=auth_headers,
+    )
+    assert res.status_code == 404
+    assert other_group_category.name not in res.text
+
+
+def test_create_accepts_own_group_category(client, auth_headers, own_group_category):
+    res = client.post("/api/transactions", json=_create_payload(own_group_category), headers=auth_headers)
+    assert res.status_code == 201
+    assert res.json()["category_name"] == own_group_category.name
+
+
+def test_create_accepts_system_default_category(client, auth_headers, category):
+    """group_id IS NULL 인 시스템 기본값은 모든 그룹이 쓸 수 있어야 한다."""
+    res = client.post("/api/transactions", json=_create_payload(category), headers=auth_headers)
+    assert res.status_code == 201
+
+
+def test_update_rejects_other_groups_category(client, auth_headers, category, other_group_category):
+    tx_id = client.post("/api/transactions", json=_create_payload(category), headers=auth_headers).json()["id"]
+
+    res = client.put(
+        f"/api/transactions/{tx_id}",
+        json={"category_id": other_group_category.id},
+        headers=auth_headers,
+    )
+    assert res.status_code == 404
+    assert other_group_category.name not in res.text
+
+
+def test_update_rejects_unknown_category(client, auth_headers, category):
+    """수정 경로는 예전에 카테고리 존재 여부조차 확인하지 않았다."""
+    tx_id = client.post("/api/transactions", json=_create_payload(category), headers=auth_headers).json()["id"]
+
+    res = client.put(f"/api/transactions/{tx_id}", json={"category_id": "없는-카테고리"}, headers=auth_headers)
+    assert res.status_code == 404
+
+
+def test_update_accepts_own_group_category(client, auth_headers, category, own_group_category):
+    tx_id = client.post("/api/transactions", json=_create_payload(category), headers=auth_headers).json()["id"]
+
+    res = client.put(
+        f"/api/transactions/{tx_id}",
+        json={"category_id": own_group_category.id},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["category_name"] == own_group_category.name
+
+
+def test_category_list_hides_other_groups_category(
+    client, auth_headers, category, own_group_category, other_group_category
+):
+    """목록과 저장이 같은 조건을 봐야 한다 — 목록에 없는 것은 붙일 수도 없어야 한다."""
+    names = {c["name"] for c in client.get("/api/categories", headers=auth_headers).json()}
+    assert category.name in names
+    assert own_group_category.name in names
+    assert other_group_category.name not in names

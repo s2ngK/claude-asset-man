@@ -60,9 +60,9 @@ sequenceDiagram
 - 카테고리 존재 확인 → 없으면 404
 - 저장 후 `joinedload`로 카테고리·사용자를 붙여 평평한 응답을 만든다
 
-⚠️ 여기서 두 가지가 검증되지 않는다:
-- **카테고리의 그룹 소유권** → [#5](https://github.com/s2ngK/claude-asset-man/issues/5) · [결함 목록](known-issues.md)
-- **`type`·`amount`·`date` 값** → [#6](https://github.com/s2ngK/claude-asset-man/issues/6)
+검증되는 것:
+- **카테고리 소유권** — `visible_categories()` 를 통과해야 한다. 시스템 기본값이거나 자기 그룹 전용이어야 하며, 아니면 404 ([#5](https://github.com/s2ngK/claude-asset-man/issues/5))
+- **`type`·`amount`·`date` 값** — Pydantic 스키마에서 막는다 ([#6](https://github.com/s2ngK/claude-asset-man/issues/6))
 
 # 저장 후
 

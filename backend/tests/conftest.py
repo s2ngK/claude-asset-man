@@ -75,3 +75,39 @@ def auth_headers(client, user):
     res = client.post("/api/auth/login", json={"invite_code": user.invite_code})
     assert res.status_code == 200
     return {"Authorization": f"Bearer {res.json()['access_token']}"}
+
+
+@pytest.fixture()
+def other_group_category(db_session):
+    """다른 그룹 전용 카테고리 — 그룹 격리 검증용.
+
+    group_id 가 NULL 이 아니므로 시스템 기본값도 아니고, 테스트 사용자의
+    그룹 것도 아니다. 어느 경로로도 이 카테고리에 닿으면 안 된다.
+    """
+    other = models.Group(id="other-group", name="다른 그룹")
+    db_session.add(other)
+    c = models.Category(
+        id="other-group-category",
+        group_id=other.id,
+        type="expense",
+        name="다른그룹전용",
+        is_default=False,
+    )
+    db_session.add(c)
+    db_session.commit()
+    return c
+
+
+@pytest.fixture()
+def own_group_category(db_session, group):
+    """테스트 사용자 그룹 전용 카테고리 — 정상 사용이 막히지 않는지 확인용."""
+    c = models.Category(
+        id="own-group-category",
+        group_id=group.id,
+        type="expense",
+        name="우리그룹전용",
+        is_default=False,
+    )
+    db_session.add(c)
+    db_session.commit()
+    return c

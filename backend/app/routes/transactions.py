@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
+from ..queries import visible_categories
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
@@ -22,6 +23,19 @@ def _storable(data: dict) -> dict:
     if isinstance(data.get("date"), date):
         data["date"] = data["date"].isoformat()
     return data
+
+
+def _require_usable_category(db: Session, category_id: str, group_id: str) -> None:
+    """카테고리가 존재하고 **이 그룹이 쓸 수 있는 것**인지 확인한다.
+
+    존재 여부만 보면 다른 그룹의 전용 카테고리를 자기 거래에 붙일 수 있고,
+    응답의 category_name 으로 그 그룹의 카테고리 이름이 새어 나간다.
+
+    남의 그룹 카테고리에는 403 이 아니라 404 를 준다 — 거래 조회/삭제와 같은 방침으로,
+    ID 를 넣어보는 것만으로 존재 여부를 알아낼 수 없게 한다.
+    """
+    if not visible_categories(db, group_id).filter(models.Category.id == category_id).first():
+        raise HTTPException(status_code=404, detail="카테고리를 찾을 수 없습니다.")
 
 
 def _serialize(t: models.Transaction) -> schemas.TransactionResponse:
@@ -73,8 +87,7 @@ def create_transaction(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    if not db.query(models.Category).filter(models.Category.id == payload.category_id).first():
-        raise HTTPException(status_code=404, detail="카테고리를 찾을 수 없습니다.")
+    _require_usable_category(db, payload.category_id, current_user.group_id)
     tx = models.Transaction(
         id=str(uuid.uuid4()),
         group_id=current_user.group_id,
@@ -100,7 +113,10 @@ def update_transaction(
     )
     if not tx:
         raise HTTPException(status_code=404, detail="거래 내역을 찾을 수 없습니다.")
-    for field, value in _storable(payload.model_dump(exclude_unset=True)).items():
+    changes = _storable(payload.model_dump(exclude_unset=True))
+    if "category_id" in changes:
+        _require_usable_category(db, changes["category_id"], current_user.group_id)
+    for field, value in changes.items():
         setattr(tx, field, value)
     db.commit()
     return _serialize(_with_relations(db, tx_id))
