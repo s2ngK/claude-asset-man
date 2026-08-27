@@ -11,6 +11,12 @@ A group personal finance (가계부) web app backed by a self-hosted Python API:
 
 Current work status and next tasks are tracked in [ROADMAP.md](./ROADMAP.md) — check it for what's in progress, backlogged, or intentionally on hold, and keep it updated as work completes.
 
+Architecture and behaviour are documented in [docs/](./docs/) — start at [docs/README.md](./docs/README.md). Two entries matter most before changing anything: [auth-and-scoping.md](./docs/auth-and-scoping.md) (the group-isolation invariant every route must uphold) and [pitfalls.md](./docs/pitfalls.md) (traps already hit — slowapi vs `Depends`, Next 16 migration, Docker).
+
+**When a change alters documented behaviour, update the matching doc in the same PR.** `docs/README.md` maps source paths to the docs that cover them. Do not hand-write endpoint or schema listings — FastAPI generates those at `/docs`; the files here cover only what OpenAPI cannot express.
+
+Known defects are tracked as GitHub Issues; [docs/known-issues.md](./docs/known-issues.md) is the index.
+
 ## Commands
 
 ### Web App (root directory)

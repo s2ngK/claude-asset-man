@@ -55,3 +55,6 @@ backend/data/*.db-journal
 /public/workbox-*.js
 /public/workbox-*.js.map
 /public/swe-worker-*.js
+
+# Obsidian (docs/ 를 볼트로 열 때 생기는 개인 설정)
+.obsidian/
