@@ -216,3 +216,74 @@ def test_category_list_hides_other_groups_category(
     assert category.name in names
     assert own_group_category.name in names
     assert other_group_category.name not in names
+
+
+# ── 자기 내역만 수정·삭제 ─────────────────────────────────────────────────────
+# 그룹 가계부라 목록과 통계는 그룹 전체를 보여준다. 다만 쓰기는 자기 것만이어야
+# 한다 — 예전에는 group_id 만 맞으면 남의 내역도 고치고 지울 수 있었다.
+
+
+def test_cannot_delete_group_mates_transaction(client, auth_headers, mate_transaction):
+    res = client.delete(f"/api/transactions/{mate_transaction.id}", headers=auth_headers)
+    assert res.status_code == 403
+
+    # 실제로 남아 있어야 한다
+    items = client.get("/api/transactions", headers=auth_headers).json()
+    assert any(t["id"] == mate_transaction.id for t in items)
+
+
+def test_cannot_update_group_mates_transaction(client, auth_headers, mate_transaction):
+    res = client.put(f"/api/transactions/{mate_transaction.id}", json={"amount": 1}, headers=auth_headers)
+    assert res.status_code == 403
+
+    items = client.get("/api/transactions", headers=auth_headers).json()
+    unchanged = next(t for t in items if t["id"] == mate_transaction.id)
+    assert unchanged["amount"] == 7000
+
+
+def test_group_mates_transaction_is_still_visible(client, auth_headers, mate_transaction):
+    """읽기는 그대로 그룹 전체다. 공동 가계부의 핵심 기능이라 좁히면 안 된다."""
+    items = client.get("/api/transactions", headers=auth_headers).json()
+    shown = next(t for t in items if t["id"] == mate_transaction.id)
+    assert shown["user_display_name"] == "같은그룹동료"
+
+
+def test_group_mates_spending_still_counts_in_stats(client, auth_headers, mate_transaction):
+    summary = client.get("/api/stats/summary?month=2026-07", headers=auth_headers).json()
+    assert summary["expense"] == 7000
+
+    members = client.get("/api/stats/members?month=2026-07", headers=auth_headers).json()
+    assert any(m["display_name"] == "같은그룹동료" for m in members)
+
+
+def test_can_still_modify_own_transaction(client, auth_headers, category):
+    tx_id = client.post("/api/transactions", json=_create_payload(category), headers=auth_headers).json()["id"]
+
+    assert client.put(f"/api/transactions/{tx_id}", json={"amount": 5000}, headers=auth_headers).status_code == 200
+    assert client.delete(f"/api/transactions/{tx_id}", headers=auth_headers).status_code == 204
+
+
+def test_other_groups_transaction_still_returns_404(client, auth_headers, db_session, category):
+    """다른 그룹 것은 403 이 아니라 404 — 목록에 안 보이므로 존재를 숨긴다."""
+    other = models.Group(id="outside-group", name="바깥 그룹")
+    db_session.add(other)
+    db_session.add(models.User(id="outside-user", group_id=other.id, display_name="외부", invite_code="OUTSIDE1"))
+    db_session.add(
+        models.Transaction(
+            id="outside-transaction",
+            group_id=other.id,
+            user_id="outside-user",
+            category_id=category.id,
+            type="expense",
+            amount=1000,
+            description="외부",
+            date="2026-07-01",
+        )
+    )
+    db_session.commit()
+
+    res = client.delete("/api/transactions/outside-transaction", headers=auth_headers)
+    assert res.status_code == 404
+
+    res = client.put("/api/transactions/outside-transaction", json={"amount": 1}, headers=auth_headers)
+    assert res.status_code == 404
