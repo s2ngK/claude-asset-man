@@ -30,6 +30,9 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, onDelete, onEdi
   // 삭제 버튼에 닿을 방법이 아예 없었다.
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return; // 왼쪽 버튼만
+    // 앞선 제스처가 click 없이 끝났으면(행 밖에서 손을 뗐다든지) 플래그가 남는다.
+    // 그대로 두면 다음에 진짜로 누른 클릭을 삼킨다. 새 제스처 시작에서 턴다.
+    swallowClick.current = false;
     drag.current = { startX: e.clientX, pointerId: e.pointerId, moved: false };
   };
 
@@ -43,7 +46,14 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, onDelete, onEdi
       d.moved = true;
       setDragging(true);
       // 포인터를 잡아둬야 커서가 행 밖으로 나가도 move/up 이 계속 들어온다.
-      e.currentTarget.setPointerCapture(e.pointerId);
+      // 다만 캡처는 **편의일 뿐**이라 실패해도 드래그는 성립해야 한다. 여기서 예외가
+      // 그대로 터지면 같은 제스처의 나머지 이벤트까지 망가진다 (활성 포인터가 없는
+      // 합성 이벤트에서 NotFoundError 로 실제로 그랬다).
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // 캡처 없이 진행한다 — 커서가 행을 벗어나면 드래그가 끊길 뿐이다
+      }
     }
 
     // 왼쪽으로만 열린다
