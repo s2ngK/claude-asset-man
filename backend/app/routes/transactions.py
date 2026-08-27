@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
@@ -10,6 +11,17 @@ from ..database import get_db
 from ..dependencies import get_current_user
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
+
+
+def _storable(data: dict) -> dict:
+    """Transaction.date 컬럼은 String 이라 date 객체를 그대로 넣을 수 없다.
+
+    스키마는 형식 검증을 위해 date 로 받고, 저장 직전 여기서 ISO 문자열로 되돌린다.
+    월 필터가 date.startswith("YYYY-MM") 이므로 이 형식이어야 한다.
+    """
+    if isinstance(data.get("date"), date):
+        data["date"] = data["date"].isoformat()
+    return data
 
 
 def _serialize(t: models.Transaction) -> schemas.TransactionResponse:
@@ -64,7 +76,10 @@ def create_transaction(
     if not db.query(models.Category).filter(models.Category.id == payload.category_id).first():
         raise HTTPException(status_code=404, detail="카테고리를 찾을 수 없습니다.")
     tx = models.Transaction(
-        id=str(uuid.uuid4()), group_id=current_user.group_id, user_id=current_user.id, **payload.model_dump()
+        id=str(uuid.uuid4()),
+        group_id=current_user.group_id,
+        user_id=current_user.id,
+        **_storable(payload.model_dump()),
     )
     db.add(tx)
     db.commit()
@@ -85,7 +100,7 @@ def update_transaction(
     )
     if not tx:
         raise HTTPException(status_code=404, detail="거래 내역을 찾을 수 없습니다.")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    for field, value in _storable(payload.model_dump(exclude_unset=True)).items():
         setattr(tx, field, value)
     db.commit()
     return _serialize(_with_relations(db, tx_id))
