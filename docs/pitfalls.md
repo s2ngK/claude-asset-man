@@ -144,9 +144,20 @@ Material Symbols Outlined를 `next/font`로 옮기려 했으나 **불가능**했
 
 `sqlite3.OperationalError: unable to open database file`. 메시지가 원인을 전혀 안 알려준다. `mkdir -p backend/data` → [개발 환경 세팅](setup.md)
 
-## `ALLOWED_ORIGINS` 기본값이 `*`다
+## 기본 시크릿으로도 뜨던 시절이 있었다 (지금은 막혀 있다)
 
-직접 `uvicorn`으로 띄우면 기본값이 그대로 적용되고, `allow_credentials=True`와 함께라서 **임의 origin을 echo back** 한다. docker-compose는 값을 명시하므로 안전하다. → [#10](https://github.com/s2ngK/claude-asset-man/issues/10) · [결함 목록](known-issues.md)
+`ALLOWED_ORIGINS` 기본값이 `*` 였고 `allow_credentials=True` 와 함께라서 **임의 origin 을
+echo back** 했다. `JWT_SECRET`·`ADMIN_KEY` 도 공개된 문자열이 기본값이었고, 경고도 기동
+차단도 없었다.
+
+지금은 기본값이 `http://localhost:3000` 이고, `APP_ENV=production` 이면 기본값이 남아 있을 때
+기동을 거부한다 → [개발 환경 세팅](setup.md) · [#10](https://github.com/s2ngK/claude-asset-man/issues/10) · [#12](https://github.com/s2ngK/claude-asset-man/issues/12)
+
+> [!WARNING] 폴백 문자열은 한 곳에서만 정한다
+> `docker-compose.yml` 의 `${JWT_SECRET:-...}` 폴백이 `app/config.py` 의 기본값과
+> **달랐던 시기가 있다**(`change-this-secret` vs `change-this-secret-in-production`).
+> 그러면 compose 로 띄운 서버가 "설정을 안 했다" 는 판정을 그대로 빠져나간다.
+> `config.PLACEHOLDER_JWT_SECRETS` 가 옛 문자열까지 들고 있는 이유다.
 
 # 스키마 변경
 

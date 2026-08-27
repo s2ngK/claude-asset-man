@@ -27,10 +27,14 @@ exp       만료 (TOKEN_EXPIRE_DAYS, 기본 30일)
 - **리프레시 토큰이 없다.** 30일 뒤 다시 초대 코드를 넣어야 한다
 - `GET /api/admin/users`는 **모든 사용자의 초대 코드를 평문으로 반환한다.** 사실상 전 계정 비밀번호 목록이다. 관리자 키로 보호되고 rate limit도 걸려 있다
 
-> [!CAUTION] 기본 시크릿으로도 서버가 그냥 뜬다
-> `JWT_SECRET`, `ADMIN_KEY`는 값이 없으면 `"change-this-secret-in-production"` 같은 기본값으로 떨어지고 경고도 없다.
-> 환경변수를 빠뜨린 채 배포하면 **공개된 문자열로 서명된 JWT**를 쓰게 되고 누구나 토큰을 위조할 수 있다.
-> → [#12](https://github.com/s2ngK/claude-asset-man/issues/12) · [결함 목록](known-issues.md)
+> [!IMPORTANT] 기본 시크릿이면 프로덕션에서 뜨지 않는다
+> `JWT_SECRET`, `ADMIN_KEY` 가 기본값 그대로면 `APP_ENV=production` 일 때 기동을 거부한다
+> (`app/config.py` 의 `verify_startup_config()`, `lifespan` 맨 앞에서 실행).
+> 개발에서는 뜨지만 경고 로그가 남는다.
+>
+> 공개된 문자열로 서명된 JWT 는 **누구나 임의의 사용자 토큰을 위조할 수 있다**는 뜻이라,
+> 조용히 넘어가면 안 되는 종류의 설정 실수다.
+> → [개발 환경 세팅](setup.md) · [#12](https://github.com/s2ngK/claude-asset-man/issues/12)
 
 ## 남의 내역은 화면에서도 열리지 않는다
 

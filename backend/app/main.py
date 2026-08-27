@@ -1,4 +1,3 @@
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,6 +6,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from . import config
 from .rate_limit import limiter
 from .routes import admin, auth, categories, stats, transactions
 from .seed import seed_initial_data
@@ -14,6 +14,8 @@ from .seed import seed_initial_data
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 설정 검증이 가장 먼저다. 안전하지 않은 상태로 프로덕션에 뜨면 여기서 멈춘다 (#10, #12).
+    config.verify_startup_config()
     # Schema is managed by Alembic migrations (see backend/alembic/) — run
     # `alembic upgrade head` before starting the app instead of relying on
     # create_all().
@@ -29,7 +31,7 @@ app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("ALLOWED_ORIGINS", "*").split(","),
+    allow_origins=config.allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

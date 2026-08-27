@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import jwt
 from sqlalchemy.orm import Session
 
-from .. import models, schemas
+from .. import config, models, schemas
 from ..database import get_db
-from ..dependencies import ALGORITHM, SECRET_KEY, get_current_user
+from ..dependencies import get_current_user
 from ..rate_limit import limiter
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -15,7 +15,11 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 def create_access_token(user_id: str, group_id: str) -> str:
     expire = datetime.now(UTC) + timedelta(days=int(os.getenv("TOKEN_EXPIRE_DAYS", "30")))
-    return jwt.encode({"sub": user_id, "group_id": group_id, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(
+        {"sub": user_id, "group_id": group_id, "exp": expire},
+        config.jwt_secret(),
+        algorithm=config.ALGORITHM,
+    )
 
 
 @router.post("/login", response_model=schemas.TokenResponse)
