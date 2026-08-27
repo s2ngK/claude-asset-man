@@ -137,7 +137,9 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, initial 
 
       <div className="mt-auto bg-indigo-50/50 dark:bg-slate-900/50 p-4 border-t border-indigo-100 dark:border-slate-800">
         <div className="grid grid-cols-4 gap-3">
-          {['7','8','9','C','4','5','6','back','1','2','3','+','0','00','-','완료'].map(label => (
+          {/* 계산기와 같은 배치다 — 오른쪽 열이 위에서부터 지우기·연산자·확정으로 내려간다.
+              숫자는 전화기가 아니라 계산기 순서(아래로 갈수록 작아짐)를 따른다. */}
+          {['7','8','9','back','4','5','6','+','1','2','3','-','0','00','C','완료'].map(label => (
             <KeypadButton key={label} label={label} onClick={handleKeyPress} onDone={handleDone}
               disabled={label === '완료' && amountToSave <= 0}
               variant={label === '완료' ? 'primary' : ['C','back','+','-'].includes(label) ? 'action' : 'number'} />
