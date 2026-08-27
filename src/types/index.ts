@@ -32,8 +32,7 @@ export interface Transaction {
   
   // Joins
   categories?: TransactionCategoryRef | null;
-  profiles?: {
-    full_name: string;
-    avatar_url: string;
-  };
+  // 서버가 평평하게 내려주는 작성자 이름. 예전엔 Supabase 조인 모양(`profiles`)을
+  // 그대로 들고 있었는데, 채워주는 코드가 없어 목록의 작성자가 전부 '나' 로 보였다.
+  user_display_name?: string;
 }

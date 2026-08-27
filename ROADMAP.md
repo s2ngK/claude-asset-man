@@ -9,16 +9,13 @@
 - [ ] 코드 리뷰에서 나온 결함 13건 해결 — [#5 ~ #17](https://github.com/s2ngK/claude-asset-man/issues?q=is%3Aissue+is%3Aopen+label%3A%22코드리뷰+2026-08%22)
   - 권장 순서: #6(입력 검증) → #5(그룹 소유권) → #7(삭제 타이머) → #8+#9(Docker 배포) → #12+#10(fail-fast) → #11(401 처리)
 
-- [ ] #12 + #10 — 기본 시크릿·와일드카드 CORS 로는 프로덕션 기동을 거부한다 (`fix/10-12-fail-fast-on-insecure-config`)
-
-- [ ] 데스크톱 마우스로 거래 삭제가 불가능한 문제 — `TransactionItem`의 스와이프를 터치 전용에서 포인터 이벤트로 전환. 코드·문서 반영 완료(`feat/pointer-swipe-delete`). 브라우저에서 포인터 시퀀스로 임계값·클램프·스냅·삭제·되돌리기까지 검증. **사람 손으로 실제 마우스 드래그 확인은 남아 있음** (자동화 도구가 pointerdown/up 을 못 만든다)
-
-- [ ] 홈 목록 기능 보완 (`feat/list-edit-sort-filter`) — 항목 클릭 시 수정, 정렬(최신순/오래된순), 필터(수입·지출·카테고리), 월 선택기 [삭제] 제거
+- [ ] #30 + #31 + #32 — 타인 기록 원천 차단, 작성자 이름 표시, 통계 점유율 ([PR #34](https://github.com/s2ngK/claude-asset-man/pull/34))
 
 ## 다음 작업 (백로그)
 
 - [x] 유출됐던 Supabase Personal Access Token 재발급/폐기 확인 (git 히스토리에선 제거 완료, 토큰 자체 회전 필요) - 별도 작업으로 프로젝트 자체 폐기
 - [x] `update-claude-md`, `change-claude` 스테일 브랜치 정리 여부 결정 (둘 다 main에 완전히 흡수된 상태) - 브랜치 정리
+- [ ] [#33](https://github.com/s2ngK/claude-asset-man/issues/33) 그룹 관리·초대 코드 발급 화면 — 지금은 `X-Admin-Key` 로 API 를 직접 불러야만 그룹·구성원을 만들 수 있다. **관리자 인증 방식부터 정해야 해서 미룬다**
 - [ ] 프론트엔드 화면 수가 늘어나면 서버 상태관리 라이브러리(react-query 등) 도입 검토
 
 ## 다음에 볼 만한 것
@@ -35,6 +32,10 @@
 
 ## 완료
 
+- [x] 스와이프 삭제를 포인터 이벤트로 전환 (PR #26) — 터치 전용이라 데스크톱 마우스로는 삭제할 방법이 아예 없었다. **사람 손으로 실제 마우스 드래그 확인은 아직 안 됨** (자동화 도구가 pointerdown/up 을 못 만들어 PointerEvent 를 직접 디스패치해 검증)
+- [x] 홈 목록 기능 보완 (PR #27) — 항목 클릭 시 수정, 정렬(최신순/오래된순), 필터(수입·지출·카테고리), 월 선택기 [삭제] 차단
+- [x] 금액 입력 UX 보완 (PR #28) — 수정 시 원래 값 placeholder, 키패드 계산기(+/-), 계산기 배치, 요약 카드를 필터와 무관하게 고정
+- [x] #12 + #10 — 기본 시크릿·와일드카드 CORS 로는 프로덕션 기동을 거부한다 (PR #29)
 - [x] Supabase/Gemini 제거, FastAPI + SQLite 백엔드로 전환, 초대 코드 기반 JWT 인증
 - [x] React Native 모바일 앱 제거, 웹 단일 서비스로 정리
 - [x] Alembic 도입 — `create_all()` 대신 마이그레이션으로 스키마 관리
