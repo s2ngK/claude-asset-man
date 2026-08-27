@@ -132,18 +132,34 @@ def visible_categories(db: Session, group_id: str) -> Query[models.Category]:
 | 저장소 | 용도 | 수명 |
 |---|---|---|
 | `localStorage` | API 호출 시 `Authorization: Bearer` | 명시적 삭제까지 |
-| 쿠키 `token` | `proxy.ts`가 읽어 라우팅 가드 | `max-age` 30일 **하드코딩** |
+| 쿠키 `token` | `proxy.ts`가 읽어 라우팅 가드 | **JWT 만료와 같은 시각** |
 
-`document.cookie`로 심기 때문에 **HttpOnly가 될 수 없다.** XSS가 나면 토큰이 그대로 털린다. `SameSite=Lax`는 걸려 있지만 `Secure` 플래그는 없다 — HTTPS 없이 배포하면 평문으로 흐른다.
+`document.cookie`로 심기 때문에 **HttpOnly가 될 수 없다.** XSS가 나면 토큰이 그대로 털린다. `SameSite=Lax`는 걸려 있고, HTTPS 로 열렸을 때는 `Secure`도 함께 붙인다.
 
-## 만료가 어긋난다
-- 쿠키 수명은 30일 하드코딩
-- JWT 수명은 `TOKEN_EXPIRE_DAYS` 환경변수 (기본 30일)
-- **이 환경변수를 줄이면 둘이 어긋난다.** 쿠키는 살아 있고 JWT는 죽은 상태가 된다
+## 만료는 한 출처에서 나온다
 
-그러면 `proxy.ts`는 통과시키고 → 화면은 열리고 → 모든 API 호출이 401이 된다. 그런데 `request()`가 401을 **처리하지 않아서** 토큰도 안 지우고 로그인으로 보내지도 않는다. 사용자는 빈 화면과 "아직 내역이 없습니다"만 보게 된다.
+`POST /api/auth/login` 이 `expires_at`(토큰의 `exp` 그대로)을 함께 내려주고, `setToken()`이 그 값에서 쿠키 `max-age`를 계산한다. **쿠키와 JWT가 같은 값을 본다.**
 
-→ [#11](https://github.com/s2ngK/claude-asset-man/issues/11) · [결함 목록](known-issues.md)
+예전에는 쿠키 수명이 30일 하드코딩이라 `TOKEN_EXPIRE_DAYS`를 줄이면 둘이 어긋났다. 쿠키는 살아 있고 JWT만 죽은 상태가 되어, `proxy.ts`는 통과시키고 → 화면은 열리고 → 모든 API 호출이 401이 되는데 아무도 그 사실을 말해주지 않았다. 사용자는 빈 목록과 "아직 내역이 없습니다"만 봤다.
+
+## 만료를 세 겹으로 잡는다
+
+| 겹 | 언제 걸리나 | 무엇을 하나 |
+|---|---|---|
+| 쿠키 `max-age` | 만료 시각이 지나면 | 브라우저가 쿠키를 스스로 지운다 → 로그인 화면 |
+| `proxy.ts` | 페이지 진입 시 | 쿠키의 JWT `exp`를 읽어 만료면 `/login?reason=expired` 로 보내고 죽은 쿠키를 지운다 |
+| `request()` | API 가 401 을 줄 때 | `clearToken()` 후 `/login?reason=expired` 로 보낸다 |
+
+> [!IMPORTANT] `proxy.ts`는 서명을 검증하지 않는다
+> `exp`만 읽는다. 여기서 하는 일은 **보안 경계가 아니라 화면 전환**이고, 실제 검증은
+> API 가 매 요청에서 한다. 서명이 틀린 토큰은 proxy 를 통과하지만 데이터를 한 줄도 못 받고,
+> 첫 401 에서 세 번째 겹이 로그인으로 돌려보낸다.
+
+> [!NOTE] 로그인 요청의 401 은 세션 만료가 아니다
+> 초대 코드가 틀렸다는 뜻이다. `request()`는 `/api/auth/login` 경로를 401 처리에서 **제외한다** —
+> 안 그러면 코드를 잘못 친 것만으로 화면이 리다이렉트된다.
+
+→ [#11](https://github.com/s2ngK/claude-asset-man/issues/11)
 
 # rate limit과 `Depends`의 함정
 

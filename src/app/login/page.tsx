@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login } from '@/lib/api';
+import { clearToken, login } from '@/lib/api';
 import { getErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 export default function LoginPage() {
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [expired, setExpired] = useState(false);
   const router = useRouter();
+
+  // `useSearchParams` 를 쓰면 이 화면 전체가 Suspense 경계를 요구한다. 읽을 값이
+  // 하나뿐이라 마운트 후 직접 본다.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('reason') !== 'expired') return;
+    setExpired(true);
+    // proxy 가 쿠키는 지웠지만 localStorage 에는 죽은 토큰이 남아 있다.
+    clearToken();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +48,11 @@ export default function LoginPage() {
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
+            {expired && (
+              <p className="rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+                세션이 만료되었습니다. 초대 코드를 다시 입력해 주세요.
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="code">초대 코드</Label>
               <Input

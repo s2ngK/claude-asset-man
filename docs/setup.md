@@ -89,7 +89,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | `ADMIN_KEY` | `change-this-admin-key` | 동일 |
 | `ALLOWED_ORIGINS` | `http://localhost:3000` | `*` 는 프로덕션에서 거부 |
 | `DATABASE_URL` | `sqlite:///./data/ledger.db` | |
-| `TOKEN_EXPIRE_DAYS` | `30` | 쿠키 수명(30일 하드코딩)과 어긋날 수 있다 |
+| `TOKEN_EXPIRE_DAYS` | `30` | 로그인 응답의 `expires_at` 으로 나가 쿠키 수명이 여기 맞춰진다 |
 | `SQL_ECHO` | `false` | 쿼리 로깅 |
 
 ## 기동 시 설정 검증
