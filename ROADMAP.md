@@ -9,6 +9,8 @@
 - [ ] 코드 리뷰에서 나온 결함 13건 해결 — [#5 ~ #17](https://github.com/s2ngK/claude-asset-man/issues?q=is%3Aissue+is%3Aopen+label%3A%22코드리뷰+2026-08%22)
   - 권장 순서: #6(입력 검증) → #5(그룹 소유권) → #7(삭제 타이머) → #8+#9(Docker 배포) → #12+#10(fail-fast) → #11(401 처리)
 
+- [ ] 홈 목록 기능 보완 (`feat/list-edit-sort-filter`) — 항목 클릭 시 수정, 정렬(최신순/오래된순), 필터(수입·지출·카테고리), 월 선택기 [삭제] 제거
+
 ## 다음 작업 (백로그)
 
 - [x] 유출됐던 Supabase Personal Access Token 재발급/폐기 확인 (git 히스토리에선 제거 완료, 토큰 자체 회전 필요) - 별도 작업으로 프로젝트 자체 폐기

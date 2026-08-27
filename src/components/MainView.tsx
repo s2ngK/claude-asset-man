@@ -7,12 +7,16 @@ import AddEntryModal from '@/components/AddEntryModal';
 import TransactionItem from '@/components/TransactionItem';
 import UndoToast from '@/components/UndoToast';
 import { Transaction, TransactionType } from '@/types';
-import { getErrorMessage } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 import {
-  getTransactions, createTransaction, deleteTransaction,
+  getTransactions, createTransaction, updateTransaction, deleteTransaction,
   getCategories, getLocalUser,
   type Transaction as ApiTransaction,
+  type Category as ApiCategory,
 } from '@/lib/api';
+
+type SortOrder = 'newest' | 'oldest';
+type TypeFilter = 'all' | TransactionType;
 
 // API 응답 → 내부 타입 변환
 function toLocalTx(t: ApiTransaction): Transaction {
@@ -37,6 +41,12 @@ export default function MainView() {
   const [loading, setLoading] = useState(false);
   const [deletedItem, setDeletedItem] = useState<{ item: Transaction; index: number } | null>(null);
   const [showUndo, setShowUndo] = useState(false);
+  // 수정 대상. null 이면 추가 모드다 — 같은 모달을 쓰고 이 값으로 갈린다.
+  const [editing, setEditing] = useState<Transaction | null>(null);
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all'); // category_id 또는 'all'
 
   const user = getLocalUser();
 
@@ -54,12 +64,23 @@ export default function MainView() {
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
+  // 필터 드롭다운과 저장 시 이름→id 매칭에 함께 쓴다. 한 번만 받아둔다.
+  useEffect(() => {
+    getCategories().then(setCategories).catch(err => console.error('category fetch error', err));
+  }, []);
+
   const handleSaveEntry = async (amount: number, categoryName: string, desc: string, type: TransactionType, date: string) => {
     try {
-      const cats = await getCategories();
+      const cats = categories.length ? categories : await getCategories();
       const cat = cats.find(c => c.name === categoryName && c.type === type) ?? cats.find(c => c.name === categoryName);
       if (!cat) throw new Error(`카테고리를 찾을 수 없습니다: ${categoryName}`);
-      await createTransaction({ category_id: cat.id, type, amount, description: desc, date });
+      const payload = { category_id: cat.id, type, amount, description: desc, date };
+      // editing 은 모달이 닫히기 전에 읽힌다 (onSave → onClose 순서).
+      if (editing) {
+        await updateTransaction(editing.id, payload);
+      } else {
+        await createTransaction(payload);
+      }
       await fetchTransactions();
     } catch (err) {
       alert('저장 실패: ' + getErrorMessage(err, '알 수 없는 오류'));
@@ -116,17 +137,49 @@ export default function MainView() {
     await fetchTransactions();
   };
 
+  const filterActive = typeFilter !== 'all' || categoryFilter !== 'all';
+
+  // 카테고리 드롭다운은 고른 종류에 맞는 것만 보여준다 (지출을 고르고 '급여'를 남겨두지 않는다).
+  const categoryOptions = useMemo(
+    () => categories.filter(c => typeFilter === 'all' || c.type === typeFilter),
+    [categories, typeFilter],
+  );
+
+  const changeTypeFilter = (next: TypeFilter) => {
+    setTypeFilter(next);
+    // 고른 카테고리가 새 종류에 없으면 조건이 영영 0건이 된다. 같이 푼다.
+    if (categoryFilter !== 'all' && next !== 'all') {
+      const picked = categories.find(c => c.id === categoryFilter);
+      if (picked && picked.type !== next) setCategoryFilter('all');
+    }
+  };
+
+  const visibleTransactions = useMemo(() => {
+    const filtered = transactions.filter(t =>
+      (typeFilter === 'all' || t.type === typeFilter) &&
+      (categoryFilter === 'all' || t.category_id === categoryFilter)
+    );
+    // 같은 날짜 안에서는 **입력 순서**로 가른다. 날짜만 보면 오늘 넣은 것들의 순서가
+    // 서버가 준 순서에 맡겨져, 방금 적은 항목이 어디 있는지 알 수 없다.
+    const key = (t: Transaction) => `${t.date} ${t.created_at ?? ''}`;
+    return [...filtered].sort((a, b) =>
+      sortOrder === 'newest' ? key(b).localeCompare(key(a)) : key(a).localeCompare(key(b)));
+  }, [transactions, typeFilter, categoryFilter, sortOrder]);
+
   const groupedTransactions = useMemo(() => {
     const groups: { [date: string]: Transaction[] } = {};
-    transactions.forEach(t => { if (!groups[t.date]) groups[t.date] = []; groups[t.date].push(t); });
-    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [transactions]);
+    // visibleTransactions 가 이미 정렬돼 있으므로 그룹 안 순서는 그대로 따라간다.
+    visibleTransactions.forEach(t => { if (!groups[t.date]) groups[t.date] = []; groups[t.date].push(t); });
+    return Object.entries(groups).sort((a, b) =>
+      sortOrder === 'newest' ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0]));
+  }, [visibleTransactions, sortOrder]);
 
+  // 합계는 **보이는 것** 기준이다. 필터를 걸었는데 합계가 안 바뀌면 무엇을 더한 건지 알 수 없다.
   const summary = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const expense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const income = visibleTransactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const expense = visibleTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     return { income, expense, balance: income - expense };
-  }, [transactions]);
+  }, [visibleTransactions]);
 
   return (
     <div className="relative min-h-screen pb-24 bg-slate-50 dark:bg-slate-950">
@@ -134,7 +187,11 @@ export default function MainView() {
         <div className="flex items-center justify-between max-w-md mx-auto">
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              <input type="month" value={currentMonth} onChange={(e) => setCurrentMonth(e.target.value)}
+              {/* required 를 주면 크롬 월 선택기에서 [삭제](지우기)가 사라진다. 값을 비우면
+                  month 파라미터가 빠져 그 달이 아니라 전체가 조회되므로, 애초에 못 비우게 한다.
+                  다른 브라우저를 대비해 onChange 에서도 빈 값을 막는다. */}
+              <input type="month" value={currentMonth} required
+                onChange={(e) => { if (e.target.value) setCurrentMonth(e.target.value); }}
                 className="bg-transparent text-lg font-bold border-none p-0 focus:ring-0 cursor-pointer" />
               <span className="material-symbols-outlined text-slate-400">expand_more</span>
             </div>
@@ -153,7 +210,9 @@ export default function MainView() {
       <div className="p-4 max-w-md mx-auto">
         <div className="rounded-2xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-4">
           <div>
-            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">이번 달 잔액</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">
+              {filterActive ? '선택한 내역 합계' : '이번 달 잔액'}
+            </p>
             <p className="text-slate-900 dark:text-white tracking-tight text-3xl font-bold">
               {new Intl.NumberFormat('ko-KR').format(summary.balance)}원
             </p>
@@ -172,13 +231,50 @@ export default function MainView() {
         </div>
       </div>
 
+      <div className="px-4 pb-3 max-w-md mx-auto flex items-center gap-2 flex-wrap">
+        <div className="flex rounded-xl bg-slate-100 dark:bg-slate-900 p-1">
+          {([['all', '전체'], ['income', '수입'], ['expense', '지출']] as const).map(([value, label]) => (
+            <button key={value} onClick={() => changeTypeFilter(value)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold transition-colors",
+                typeFilter === value
+                  ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                  : "text-slate-400"
+              )}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+          aria-label="카테고리 필터"
+          className="h-8 rounded-xl bg-slate-100 dark:bg-slate-900 px-3 text-xs font-bold text-slate-600 dark:text-slate-300 border-none outline-none">
+          <option value="all">전체 카테고리</option>
+          {categoryOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+
+        <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
+          className="ml-auto flex items-center gap-1 h-8 px-3 rounded-xl bg-slate-100 dark:bg-slate-900 text-xs font-bold text-slate-600 dark:text-slate-300">
+          <span className="material-symbols-outlined text-[16px]">swap_vert</span>
+          {sortOrder === 'newest' ? '최신순' : '오래된순'}
+        </button>
+      </div>
+
       <main className="max-w-md mx-auto">
         {loading && transactions.length === 0 ? (
           <div className="p-8 text-center text-slate-400">로딩 중...</div>
-        ) : transactions.length === 0 ? (
+        ) : visibleTransactions.length === 0 ? (
           <div className="bg-slate-100 dark:bg-slate-900/50 rounded-xl p-8 text-center text-slate-500 mx-4 mt-4">
             <span className="material-symbols-outlined text-4xl mb-2">receipt_long</span>
-            <p>아직 내역이 없습니다.</p>
+            {transactions.length === 0 ? (
+              <p>아직 내역이 없습니다.</p>
+            ) : (
+              <>
+                <p>조건에 맞는 내역이 없습니다.</p>
+                <button onClick={() => { setTypeFilter('all'); setCategoryFilter('all'); }}
+                  className="mt-3 text-xs font-bold text-emerald-500">필터 초기화</button>
+              </>
+            )}
           </div>
         ) : (
           groupedTransactions.map(([date, items]) => (
@@ -188,7 +284,9 @@ export default function MainView() {
                 <span className="text-[10px] text-slate-400">{items.length}건</span>
               </div>
               {items.map(item => (
-                <TransactionItem key={item.id} item={item} onDelete={() => handleDelete(item.id)} />
+                <TransactionItem key={item.id} item={item}
+                  onDelete={() => handleDelete(item.id)}
+                  onEdit={item.user_id === user?.id ? () => setEditing(item) : undefined} />
               ))}
             </div>
           ))
@@ -213,8 +311,18 @@ export default function MainView() {
         </div>
       </nav>
 
-      {isAddEntryOpen && (
-        <AddEntryModal onClose={() => setIsAddEntryOpen(false)} onSave={handleSaveEntry} />
+      {(isAddEntryOpen || editing) && (
+        <AddEntryModal
+          onClose={() => { setIsAddEntryOpen(false); setEditing(null); }}
+          onSave={handleSaveEntry}
+          initial={editing ? {
+            amount: editing.amount,
+            categoryName: editing.categories?.name ?? '기타',
+            description: editing.description,
+            type: editing.type,
+            date: editing.date,
+          } : undefined}
+        />
       )}
       {showUndo && <UndoToast onUndo={handleUndo} onClose={() => setShowUndo(false)} />}
     </div>
