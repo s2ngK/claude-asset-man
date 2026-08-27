@@ -70,11 +70,12 @@ erDiagram
 
 - ISO `YYYY-MM-DD`는 **사전순 정렬이 곧 날짜순**이라 `ORDER BY date`가 그대로 동작한다
 - 월 필터가 `date.startswith("2026-08")` 한 줄로 끝난다
-- 대신 **DB 레벨 형식 검증이 없다.** 아무 문자열이나 들어간다 → [#6](https://github.com/s2ngK/claude-asset-man/issues/6) · [결함 목록](known-issues.md)
+- DB 레벨 제약은 여전히 없지만, **API 경계에서 Pydantic이 막는다** — 입력을 `date`로 받아 검증하고 저장 직전 ISO 문자열로 되돌린다 (`routes/transactions.py`의 `_storable`) · [결함 목록](known-issues.md)
 
-## `type`도 그냥 `String`이다
-- CHECK 제약도 Enum도 없다. `'income'` / `'expense'`는 순전히 관례
-- 오타가 들어가면 목록에는 보이는데 [통계에서는 증발한다](stats-rules.md)
+## `type`은 DB에선 그냥 `String`이다
+- 컬럼에는 CHECK 제약도 Enum도 없다
+- 대신 **Pydantic이 `Literal["income", "expense"]`로 막는다** (`schemas.TransactionType`)
+- API를 거치지 않고 DB에 직접 쓰면 여전히 아무 값이나 들어간다. 그런 행은 [통계에서 증발한다](stats-rules.md)
 
 ## 그룹이 하나뿐인데 `group_id`를 유지한다
 다중 그룹으로 확장할 때 스키마 변경 없이 열리도록 처음부터 넣어둔 것이다. 이건 "미래를 위한 빈 자리"가 아니라 **지금도 실제로 격리에 쓰이는 컬럼**이다.

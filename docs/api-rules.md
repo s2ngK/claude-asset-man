@@ -35,7 +35,7 @@
 - `group_id`, `user_id`는 **토큰에서 채운다.** 요청 본문에 넣어도 무시된다
 - 카테고리가 없으면 **404**
 - ⚠️ **카테고리의 그룹 소유권은 검사하지 않는다** → [#5](https://github.com/s2ngK/claude-asset-man/issues/5) · [결함 목록](known-issues.md)
-- ⚠️ `type`·`amount`·`date` 값 검증이 없다. `type='바나나'`, `amount=-50000`, `date='내일'`이 전부 201로 저장된다 → [#6](https://github.com/s2ngK/claude-asset-man/issues/6)
+- `type`은 `income`/`expense`만, `amount`는 **양수만**, `date`는 `YYYY-MM-DD`만 받는다. 어긋나면 **422**
 
 ## `PUT /{tx_id}`
 - `id` + `group_id`로 찾는다. 남의 그룹 것이면 **404** (403이 아니다 — 존재를 숨긴다)

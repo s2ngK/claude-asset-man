@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+from datetime import date as date_type
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# 거래의 수입/지출 구분. models.Transaction.type 은 CHECK 제약 없는 String 이므로
+# 여기서 막지 않으면 임의의 문자열이 저장되고, stats.py 가 income/expense 만
+# 집계하기 때문에 그 거래는 목록에는 보이면서 합계에서는 조용히 빠진다.
+TransactionType = Literal["income", "expense"]
 
 
 class LoginRequest(BaseModel):
@@ -37,18 +44,21 @@ class CategoryResponse(BaseModel):
 
 class TransactionCreate(BaseModel):
     category_id: str
-    type: str
-    amount: int
+    type: TransactionType
+    # 부호는 type 이 나타낸다. 음수 금액은 집계를 뒤집으므로 받지 않는다.
+    amount: int = Field(gt=0)
     description: str | None = None
-    date: str
+    # 입력은 date 로 검증하고 저장은 "YYYY-MM-DD" 문자열로 한다 —
+    # 월 필터가 date.startswith(month) 라서 형식이 어긋나면 어느 달에도 잡히지 않는다.
+    date: date_type
 
 
 class TransactionUpdate(BaseModel):
     category_id: str | None = None
-    type: str | None = None
-    amount: int | None = None
+    type: TransactionType | None = None
+    amount: int | None = Field(default=None, gt=0)
     description: str | None = None
-    date: str | None = None
+    date: date_type | None = None
 
 
 class TransactionResponse(BaseModel):

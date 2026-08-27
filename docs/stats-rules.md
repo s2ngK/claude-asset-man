@@ -70,19 +70,19 @@ percentage = round(r.total / total * 100, 1)
 
 ⚠️ **그 달에 지출이 없는 구성원은 목록에 아예 나오지 않는다.** 0원으로도 안 나온다.
 
-# ⚠️ 잘못된 `type`은 조용히 증발한다
+# 집계에서 빠지는 행
 
-집계는 `type == 'income'` 또는 `'expense'`인 행만 센다. 그런데 `type`에 **검증이 없다** → [#6](https://github.com/s2ngK/claude-asset-man/issues/6) · [결함 목록](known-issues.md)
+집계는 `type == 'income'` 또는 `'expense'`인 행만 센다. 다른 값이 들어간 행은 목록에는
+보이면서 합계에서만 사라진다 — 사용자에게는 **"목록엔 있는데 합계엔 없다"**로 나타나
+원인을 찾기 매우 어렵다.
 
-```
-type='바나나'로 거래 생성 → HTTP 201, 저장됨
-목록 조회 → 보인다
-/stats/summary → {income: 0, expense: 0}   ← 어디에도 없다
-```
+API 경계에서는 [#6](https://github.com/s2ngK/claude-asset-man/issues/6)으로 막혔다. `type`은 `Literal["income", "expense"]`,
+`amount`는 양수, `date`는 `date`로 검증하므로 **REST를 거친 입력은 반드시 집계에 잡힌다**
+(회귀 테스트: `test_valid_transaction_reaches_the_summary`).
 
-사용자에게는 **"목록엔 있는데 합계엔 없다"**로 나타난다. 원인을 찾기 매우 어려운 형태다.
-
-Pydantic에서 `type: Literal["income","expense"]`로 막는 것이 근본 해결이다.
+여전히 빠질 수 있는 경로:
+- **DB에 직접 쓴 행** — 마이그레이션, 수동 SQL, 시드 스크립트
+- **이미 저장돼 있던 행** — 검증이 붙기 전 데이터. 필요하면 한 번 훑어야 한다
 
 # 성능
 
