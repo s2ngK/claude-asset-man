@@ -114,16 +114,29 @@ cd backend && uv run pytest
 # Docker
 
 ```bash
-docker compose up --build
+JWT_SECRET=... ADMIN_KEY=... docker compose up --build
 ```
 
-> [!CAUTION] 현재 프론트엔드 빌드가 실패한다
-> `Dockerfile.frontend`가 `.next/standalone`을 복사하는데, `next.config.ts`에
-> `output: "standalone"`이 없어서 그 디렉터리가 생성되지 않는다.
-> → [#8](https://github.com/s2ngK/claude-asset-man/issues/8) · [결함 목록](known-issues.md). 고쳐지기 전까지는 위의 로컬 방식을 쓴다.
+백엔드 :8000, 프론트엔드 :3000. 백엔드가 healthy 가 된 뒤 프론트엔드가 뜬다.
+백엔드는 시작 시 `alembic upgrade head` 를 자동 실행하고, DB 는 `backend/data/ledger.db` 에
+bind mount 로 남는다.
 
-백엔드 컨테이너는 정상이다. 시작 시 `alembic upgrade head`를 자동 실행하고,
-DB는 `backend/data/ledger.db`에 bind mount로 남는다.
+## 배포할 호스트 주소 지정
+
+```bash
+API_URL=https://ledger.example.com docker compose up --build
+```
+
+`NEXT_PUBLIC_API_URL` 은 **빌드 시점에 번들로 인라인**되므로 compose 가 이 값을
+`build.args` 로 넘긴다. `environment` 로 넣으면 아무 효과가 없다 → [함정과 교훈](pitfalls.md)
+
+**주소를 바꾸면 프론트엔드 이미지를 다시 빌드해야 한다.** 컨테이너만 재시작해서는 안 바뀐다.
+
+## 알아둘 점
+
+- 루트 `.dockerignore` 가 `node_modules`·`.next`·`backend/data` 를 막는다. 없으면 컨텍스트가
+  800MB 를 넘고 **호스트의 개발 DB 가 이미지에 딸려 들어간다**
+- 백엔드 healthcheck 는 curl 이 아니라 파이썬으로 한다 — `python:3.12-slim` 에 curl 이 없다
 
 # git 워크플로
 
