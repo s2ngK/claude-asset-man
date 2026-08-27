@@ -16,7 +16,6 @@
 
 ## 다음에 볼 만한 것
 
-- [ ] `middleware.ts` → `proxy.ts` 전환 — Next 16에서 `middleware` 파일 컨벤션 deprecated 경고 발생 중
 - [ ] next-pwa가 webpack 설정을 주입해 Turbopack을 못 씀 (`dev`/`build` 모두 `--webpack` 고정 중). Turbopack 전환하려면 PWA 플러그인 대안 검토 필요
 
 ## 보류 (지금은 손대지 않음)
@@ -39,4 +38,5 @@
 - [x] `npm run lint` 정상화 — 원인은 Next 16에서 `next lint` 제거된 것(`next dev lint`로 해석되어 `./lint` 디렉터리를 찾음). `eslint .`로 교체하고, `public/`(next-pwa 생성물)·`references/`(프로토타입)를 lint 대상에서 제외, `src/` 실제 경고/에러 9건 전부 수정
 - [x] 위 작업 중 발견한 선행 버그 수정 — `DEFAULT_CATEGORIES`에 `type`이 없어 거래 추가 모달의 카테고리 목록이 항상 비어 있었고, `TokenResponse` 타입이 실제 응답(`user_id`)과 어긋나 있었음. 둘 다 `npm run build`(tsc)를 실패시키던 원인
 - [x] `npm run dev` 정상화 — next-pwa의 webpack 설정과 Next 16 기본 Turbopack이 충돌해 실행 불가였음, `build`와 동일하게 `--webpack` 고정
+- [x] `middleware.ts` → `proxy.ts` 전환 — Next 16에서 `middleware` 파일 컨벤션이 `proxy`로 이름 바뀜. 파일명과 export 함수명을 `proxy`로 바꾸고 `config`에 `ProxyConfig` 타입 적용(`NextMiddleware`/`MiddlewareConfig`는 deprecated). 동작은 동일 — 빌드 출력의 `ƒ Proxy (Middleware)`로 등록 확인
 - [x] 안 쓰는 환경변수/키 정리 — `.env.local`의 Supabase·Gemini 키(모두 `EXPO_PUBLIC_*`, 제거된 모바일 앱 잔재)와 `.env`의 `GOOGLE_API_KEY` 삭제, `.env.local`은 `NEXT_PUBLIC_API_URL`만 남김. `.env.example`에서도 `EXPO_PUBLIC_API_URL` 제거. **키 파일은 지웠지만 Gemini API 키 자체는 Google AI Studio에서 별도로 폐기해야 함**

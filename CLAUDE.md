@@ -57,9 +57,9 @@ Backend data persists in `backend/data/ledger.db` (SQLite file, bind-mounted).
 
 ### Web App (`/`)
 
-**Routing & Auth:** `src/middleware.ts` checks for a `token` cookie — redirects to `/login` if absent, redirects to `/` if already logged in. Simpler than before: no Supabase, just a JWT cookie check.
+**Routing & Auth:** `src/proxy.ts` (Next 16's rename of the `middleware` convention — exports a `proxy` function) checks for a `token` cookie — redirects to `/login` if absent, redirects to `/` if already logged in. Simpler than before: no Supabase, just a JWT cookie check.
 
-**API client:** `src/lib/api.ts` — all backend calls. Token stored in `localStorage` + `document.cookie` (cookie for middleware, localStorage for client reads). Helper exports: `getToken`, `setToken`, `clearToken`, `getLocalUser`.
+**API client:** `src/lib/api.ts` — all backend calls. Token stored in `localStorage` + `document.cookie` (cookie for `proxy.ts`, localStorage for client reads). Helper exports: `getToken`, `setToken`, `clearToken`, `getLocalUser`.
 
 **Key components:**
 - `MainView` — transaction list with month selector, summary card, optimistic delete with undo toast
