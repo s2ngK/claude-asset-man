@@ -25,6 +25,29 @@ def _storable(data: dict) -> dict:
     return data
 
 
+def _own_transaction(db: Session, tx_id: str, user: models.User) -> models.Transaction:
+    """수정·삭제 대상 거래를 가져온다. **자기가 쓴 것만** 건드릴 수 있다.
+
+    두 단계로 나눠 응답을 다르게 준다.
+
+    - 다른 **그룹**의 거래 → 404. 목록에 애초에 안 나오므로 존재를 숨긴다
+      (카테고리 소유권 검증과 같은 방침).
+    - 같은 그룹의 **다른 구성원** 거래 → 403. 목록에 이미 보이고 작성자 이름까지
+      표시되므로 숨길 것이 없다. 404 를 주면 "화면에 있는데 없다고 한다"가 되어
+      오히려 헷갈린다.
+    """
+    tx = (
+        db.query(models.Transaction)
+        .filter(models.Transaction.id == tx_id, models.Transaction.group_id == user.group_id)
+        .first()
+    )
+    if not tx:
+        raise HTTPException(status_code=404, detail="거래 내역을 찾을 수 없습니다.")
+    if tx.user_id != user.id:
+        raise HTTPException(status_code=403, detail="다른 구성원의 내역은 수정하거나 삭제할 수 없습니다.")
+    return tx
+
+
 def _require_usable_category(db: Session, category_id: str, group_id: str) -> None:
     """카테고리가 존재하고 **이 그룹이 쓸 수 있는 것**인지 확인한다.
 
@@ -106,13 +129,7 @@ def update_transaction(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    tx = (
-        db.query(models.Transaction)
-        .filter(models.Transaction.id == tx_id, models.Transaction.group_id == current_user.group_id)
-        .first()
-    )
-    if not tx:
-        raise HTTPException(status_code=404, detail="거래 내역을 찾을 수 없습니다.")
+    tx = _own_transaction(db, tx_id, current_user)
     changes = _storable(payload.model_dump(exclude_unset=True))
     if "category_id" in changes:
         _require_usable_category(db, changes["category_id"], current_user.group_id)
@@ -126,12 +143,6 @@ def update_transaction(
 def delete_transaction(
     tx_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
-    tx = (
-        db.query(models.Transaction)
-        .filter(models.Transaction.id == tx_id, models.Transaction.group_id == current_user.group_id)
-        .first()
-    )
-    if not tx:
-        raise HTTPException(status_code=404, detail="거래 내역을 찾을 수 없습니다.")
+    tx = _own_transaction(db, tx_id, current_user)
     db.delete(tx)
     db.commit()
