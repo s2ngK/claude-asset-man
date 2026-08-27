@@ -20,7 +20,7 @@
 
 | 이슈 | 심각도 | 내용 | 위치 | 관련 문서 |
 |---|---|---|---|---|
-| [#5](https://github.com/s2ngK/claude-asset-man/issues/5) | 🔴 | 거래 생성 시 **카테고리의 그룹 소유권 미검증** | `routes/transactions.py` | [인증과 그룹 격리](auth-and-scoping.md) |
+| ~~[#5](https://github.com/s2ngK/claude-asset-man/issues/5)~~ | ✅ | ~~거래 생성 시 카테고리의 그룹 소유권 미검증~~ — **해결됨** | `routes/transactions.py` | [인증과 그룹 격리](auth-and-scoping.md) |
 | ~~[#6](https://github.com/s2ngK/claude-asset-man/issues/6)~~ | ✅ | ~~`type`·`amount`·`date` 값 검증 전무~~ — **해결됨** | `schemas.py` | [통계 집계 규칙](stats-rules.md) |
 | [#7](https://github.com/s2ngK/claude-asset-man/issues/7) | 🔴 | 연속 삭제 시 **먼저 지운 항목이 서버에 남음** | `MainView.tsx` | [삭제와 되돌리기](flow-delete-undo.md) |
 | [#8](https://github.com/s2ngK/claude-asset-man/issues/8) | 🟠 | `docker compose up --build` **프론트 빌드 실패** | `Dockerfile.frontend` | [개발 환경 세팅](setup.md) |
@@ -38,13 +38,25 @@
 
 01 · 02 · 06은 실제로 서버를 띄워 확인했다. 나머지는 코드 판독 근거.
 
-## [#5](https://github.com/s2ngK/claude-asset-man/issues/5) — 타 그룹 카테고리 붙이기
+## [#5](https://github.com/s2ngK/claude-asset-man/issues/5) — 타 그룹 카테고리 붙이기 ✅ **해결됨**
+
+리뷰 시점:
 ```
 그룹B 전용 카테고리 생성 (name='B그룹비밀카테고리')
 A유저가 그 category_id로 거래 생성 → HTTP 201
-응답 category_name = 'B그룹비밀카테고리'
+응답 category_name = 'B그룹비밀카테고리'      ← 이름 유출
 ```
-지금은 모든 카테고리가 시스템 기본값이라 실질 피해가 없다. **그룹 전용 카테고리 기능을 붙이는 순간 실제 유출이 된다.**
+
+수정 후 동일 시나리오 재실행:
+```
+POST  B그룹 카테고리로 거래 생성   → 404 ✅  이름 유출 없음 ✅
+PUT   category_id 를 B그룹 것으로 → 404 ✅  이름 유출 없음 ✅
+PUT   없는 카테고리로 변경         → 404 ✅  (예전엔 검증 자체가 없었음)
+GET   /api/categories            → B그룹 카테고리 안 보임 ✅
+정상   시스템 기본값으로 생성      → 201 ✅
+```
+
+목록 조회와 저장이 `queries.visible_categories()` **같은 함수**를 보게 해서 조건이 갈라지지 않게 했다. 테스트 7개 추가.
 
 ## [#6](https://github.com/s2ngK/claude-asset-man/issues/6) — 아무 값이나 저장됨 ✅ **해결됨**
 
@@ -87,7 +99,7 @@ Docker 데몬이 꺼져 있어 이미지 빌드 자체는 실행하지 못했다
 # 권장 처리 순서
 
 1. ~~**[#6](https://github.com/s2ngK/claude-asset-man/issues/6)**~~ — ✅ **완료.** Pydantic 스키마로 구멍 3개를 한 번에 막고 회귀 테스트 7개 추가. 덤으로 OpenAPI 스펙이 `enum`·`exclusiveMinimum`·`format: date`를 갖게 됐다 → [#13](https://github.com/s2ngK/claude-asset-man/issues/13)의 첫 삽
-2. **[#5](https://github.com/s2ngK/claude-asset-man/issues/5)** — `categories.py`의 필터 조건을 헬퍼로 빼서 재사용
+2. ~~**[#5](https://github.com/s2ngK/claude-asset-man/issues/5)**~~ — ✅ **완료.** 필터를 `app/queries.py` 의 `visible_categories()` 로 빼서 목록 조회와 참조 검증이 같은 조건을 보게 했다
 3. **[#7](https://github.com/s2ngK/claude-asset-man/issues/7)** — 사용자가 실제로 겪는 유일한 데이터 유실 경로
 4. **[#8](https://github.com/s2ngK/claude-asset-man/issues/8) + [#9](https://github.com/s2ngK/claude-asset-man/issues/9)** — 둘 다 한 줄 수정. 고친 뒤 **실제로 `docker compose up --build`를 돌려 확인**하는 것까지가 작업
 5. **[#12](https://github.com/s2ngK/claude-asset-man/issues/12) + [#10](https://github.com/s2ngK/claude-asset-man/issues/10)** — `lifespan`에서 한 번 검사하면 둘 다 처리. 외부 노출 계획이 있으면 순위를 올린다

@@ -34,13 +34,13 @@
 ## `POST ""` → 201
 - `group_id`, `user_id`는 **토큰에서 채운다.** 요청 본문에 넣어도 무시된다
 - 카테고리가 없으면 **404**
-- ⚠️ **카테고리의 그룹 소유권은 검사하지 않는다** → [#5](https://github.com/s2ngK/claude-asset-man/issues/5) · [결함 목록](known-issues.md)
+- 카테고리가 **호출자의 그룹이 쓸 수 있는 것**이어야 한다 (시스템 기본값 또는 자기 그룹 전용). 아니면 **404**
 - `type`은 `income`/`expense`만, `amount`는 **양수만**, `date`는 `YYYY-MM-DD`만 받는다. 어긋나면 **422**
 
 ## `PUT /{tx_id}`
 - `id` + `group_id`로 찾는다. 남의 그룹 것이면 **404** (403이 아니다 — 존재를 숨긴다)
 - `exclude_unset=True`라 **보낸 필드만** 바뀐다
-- ⚠️ `category_id`를 바꿀 때 **존재 여부조차 확인하지 않는다.** POST보다 더 느슨하다
+- `category_id`를 바꿀 때도 POST와 **동일한 소유권 검증**을 거친다. 아니면 **404**
 
 ## `DELETE /{tx_id}` → 204
 - 남의 그룹 것이면 **404**
