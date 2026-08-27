@@ -13,20 +13,30 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      # python:3.12-slim 에는 curl 이 없다. 이미지에 뭘 더 넣지 않고
+      # 이미 있는 파이썬으로 확인한다 — 200 이 아니면 urlopen 이 예외를 던진다.
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://localhost:8000/health")
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # 첫 기동 때 alembic upgrade head 가 도는 시간을 준다.
+      start_period: 15s
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      # NEXT_PUBLIC_* 은 빌드 시점에 번들로 인라인된다. environment 로 넘기면
+      # 런타임에 주입돼 봐야 이미 박힌 값을 못 바꾼다 — 반드시 build args 여야 한다.
+      args:
+        NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:8000}
     container_name: ledger-frontend
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=${API_URL:-http://localhost:8000}
     depends_on:
       backend:
         condition: service_healthy

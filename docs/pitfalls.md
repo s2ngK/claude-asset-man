@@ -53,13 +53,53 @@ CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --
 
 이미지는 빌드 후 불변이므로 런타임 동기화가 애초에 필요 없다.
 
-## `.dockerignore`가 없으면 이미지가 오염된다
+## `.dockerignore` 가 없으면 이미지가 오염된다
 
-로컬 `.venv/`, `data/*.db`, `__pycache__`가 빌드 컨텍스트에 통째로 들어간다. **로컬 개발 DB가 이미지에 박히는** 사고가 난다. `backend/.dockerignore`로 반드시 제외한다.
+로컬 `.venv/`, `data/*.db`, `node_modules`, `.next` 가 빌드 컨텍스트에 통째로 들어간다.
+**로컬 개발 DB 가 이미지에 박히는** 사고가 난다.
+
+`backend/.dockerignore` 와 **루트 `.dockerignore` 둘 다** 필요하다 — 프론트엔드 빌드는
+저장소 루트를 컨텍스트로 쓰기 때문이다. 루트 것을 추가하고 컨텍스트가
+**819MB → 800KB** 로 줄었다.
 
 ## `NEXT_PUBLIC_*`은 런타임 환경변수가 아니다
 
-빌드 시점에 번들로 **인라인**된다. docker-compose의 `environment:`로 넣으면 아무 효과가 없다. `build.args`로 넘겨야 한다. → [#9](https://github.com/s2ngK/claude-asset-man/issues/9) · [결함 목록](known-issues.md)
+빌드 시점에 번들로 **인라인**된다. docker-compose 의 `environment:` 로 넣으면 런타임에
+주입돼 봐야 이미 박힌 값을 못 바꾼다. 반드시 `build.args` 로 넘겨야 한다.
+
+```yaml
+build:
+  context: .
+  dockerfile: Dockerfile.frontend
+  args:
+    NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:8000}
+```
+
+같은 이유로 **API 주소를 바꾸면 이미지를 다시 빌드해야 한다.**
+
+## `python:*-slim` 에는 curl 이 없다
+
+healthcheck 를 `curl -f .../health` 로 걸면 **영원히 실패한다.** API 는 멀쩡히 200 을
+주는데도 그렇다. 그리고 `depends_on: condition: service_healthy` 가 걸린 서비스는
+그 때문에 아예 기동하지 못한다.
+
+이미지에 curl 을 설치하는 대신 이미 있는 파이썬을 쓴다 — 200 이 아니면 예외가 난다.
+
+```yaml
+test:
+  - CMD
+  - python
+  - -c
+  - import urllib.request; urllib.request.urlopen("http://localhost:8000/health")
+start_period: 15s   # 첫 기동의 alembic upgrade head 시간을 준다
+```
+
+컨테이너가 `Up (unhealthy)` 인데 로그는 정상이라면 healthcheck 명령 자체를 의심할 것.
+사유는 여기서 보인다:
+
+```bash
+docker inspect ledger-backend --format '{{range .State.Health.Log}}{{.Output}}{{end}}'
+```
 
 # Next.js 16 마이그레이션
 
