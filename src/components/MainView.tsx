@@ -37,7 +37,6 @@ export default function MainView() {
   const [loading, setLoading] = useState(false);
   const [deletedItem, setDeletedItem] = useState<{ item: Transaction; index: number } | null>(null);
   const [showUndo, setShowUndo] = useState(false);
-  const [deleteTimer, setDeleteTimer] = useState<NodeJS.Timeout | null>(null);
 
   const user = getLocalUser();
 
@@ -67,31 +66,54 @@ export default function MainView() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    const index = transactions.findIndex(t => t.id === id);
-    if (index === -1) return;
-    const itemToDelete = transactions[index];
-    setTransactions(prev => prev.filter(t => t.id !== id));
-    setDeletedItem({ item: itemToDelete, index });
-    setShowUndo(true);
-    if (deleteTimer) clearTimeout(deleteTimer);
-    const timer = setTimeout(async () => {
-      try { await deleteTransaction(id); } catch { fetchTransactions(); }
-      setShowUndo(false);
-      setDeletedItem(null);
-    }, 4000);
-    setDeleteTimer(timer);
+  const restoreAt = (item: Transaction, index: number) => {
+    setTransactions(prev => {
+      const next = [...prev];
+      next.splice(index, 0, item);
+      return next;
+    });
   };
 
-  const handleUndo = () => {
-    if (deleteTimer) clearTimeout(deleteTimer);
-    if (deletedItem) {
-      const next = [...transactions];
-      next.splice(deletedItem.index, 0, deletedItem.item);
-      setTransactions(next);
+  // 삭제는 서버에 바로 반영한다. 예전에는 4초 뒤에 커밋하고 그 사이 되돌리기를
+  // 타이머 취소로 처리했는데, 타이머 핸들이 하나뿐이라 연속 삭제 시 앞 항목의
+  // 서버 요청까지 취소됐고(화면엔 없는데 서버엔 남음), 4초 안에 화면을 벗어나면
+  // 삭제 자체가 유실됐다. 되돌리기를 재생성으로 바꾸면 그 지연 커밋이 필요 없어진다.
+  const handleDelete = async (id: string) => {
+    const index = transactions.findIndex(t => t.id === id);
+    if (index === -1) return;
+    const item = transactions[index];
+
+    setTransactions(prev => prev.filter(t => t.id !== id));
+    try {
+      await deleteTransaction(id);
+    } catch (err) {
+      restoreAt(item, index);
+      alert('삭제 실패: ' + getErrorMessage(err, '알 수 없는 오류'));
+      return;
     }
+    setDeletedItem({ item, index });
+    setShowUndo(true);
+  };
+
+  // 되돌리기는 취소가 아니라 같은 내용으로 다시 만드는 것이다.
+  // 서버가 새 id 를 발급하므로 저장 후 목록을 다시 받아 화면과 서버를 맞춘다.
+  const handleUndo = async () => {
+    if (!deletedItem) return;
+    const { item } = deletedItem;
     setShowUndo(false);
     setDeletedItem(null);
+    try {
+      await createTransaction({
+        category_id: item.category_id,
+        type: item.type,
+        amount: item.amount,
+        description: item.description,
+        date: item.date,
+      });
+    } catch (err) {
+      alert('되돌리기 실패: ' + getErrorMessage(err, '알 수 없는 오류'));
+    }
+    await fetchTransactions();
   };
 
   const groupedTransactions = useMemo(() => {
