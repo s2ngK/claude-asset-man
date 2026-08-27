@@ -8,7 +8,11 @@ services:
       - ./backend/data:/app/data
     environment:
       - DATABASE_URL=sqlite:///./data/ledger.db
-      - JWT_SECRET=${JWT_SECRET:-change-this-secret}
+      # production 이면 아래 값이 기본값 그대로일 때 기동을 거부한다 (app/config.py).
+      - APP_ENV=${APP_ENV:-development}
+      # 폴백 문자열은 app/config.py 의 DEFAULT_* 와 **같아야 한다** — 달라지면
+      # "설정을 안 했다" 는 판정을 빠져나간다.
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-in-production}
       - ADMIN_KEY=${ADMIN_KEY:-change-this-admin-key}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
     restart: unless-stopped
