@@ -10,6 +10,14 @@ export interface Category {
   is_default: boolean;
 }
 
+// 거래 목록 표시용 카테고리 조인 (API 응답으로 채울 수 있는 필드만)
+export interface TransactionCategoryRef {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
 export interface Transaction {
   id: string;
   group_id: string;
@@ -23,7 +31,7 @@ export interface Transaction {
   created_at?: string;
   
   // Joins
-  categories?: Category;
+  categories?: TransactionCategoryRef | null;
   profiles?: {
     full_name: string;
     avatar_url: string;

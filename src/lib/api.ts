@@ -59,14 +59,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 export interface AuthUser { id: string; group_id: string; display_name: string; }
-export interface TokenResponse extends AuthUser { access_token: string; token_type: string; }
+// /api/auth/login 응답은 `id`가 아니라 `user_id`를 돌려줌 (backend/app/schemas.py TokenResponse)
+export interface TokenResponse { access_token: string; token_type: string; user_id: string; group_id: string; display_name: string; }
 
 export async function login(inviteCode: string): Promise<TokenResponse> {
   const data = await request<TokenResponse>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ invite_code: inviteCode }),
   });
-  setToken(data.access_token, data.display_name, data.user_id ?? data.id, data.group_id);
+  setToken(data.access_token, data.display_name, data.user_id, data.group_id);
   return data;
 }
 

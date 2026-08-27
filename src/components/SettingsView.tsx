@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { logout, getLocalUser } from '@/lib/api';
 import { useRouter } from 'next/navigation';
@@ -9,13 +8,6 @@ import { useRouter } from 'next/navigation';
 export default function SettingsView() {
   const router = useRouter();
   const user = getLocalUser();
-
-  const handleCopyCode = () => {
-    if (user?.id) {
-      navigator.clipboard.writeText(user.id);
-      alert('사용자 ID가 복사되었습니다.');
-    }
-  };
 
   const handleLogout = () => {
     logout();

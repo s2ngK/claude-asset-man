@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { getCategoryStats, getTrend, getMemberStats, getLocalUser, type CategoryStat, type TrendItem, type MemberStat } from '@/lib/api';
+import { getCategoryStats, getTrend, getMemberStats, type CategoryStat, type TrendItem, type MemberStat } from '@/lib/api';
 
 export default function StatsView() {
   const [activeTab, setActiveTab] = useState<'my' | 'group'>('my');
@@ -13,8 +13,6 @@ export default function StatsView() {
   const [categoryData, setCategoryData] = useState<CategoryStat[]>([]);
   const [trendData, setTrendData] = useState<Array<TrendItem & { month_label: string; balance: number }>>([]);
   const [memberRanking, setMemberRanking] = useState<MemberStat[]>([]);
-
-  const user = getLocalUser();
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -80,86 +78,92 @@ export default function StatsView() {
            />
         </div>
 
-        {/* Summary & Pie Chart */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-800">
-          <p className="text-slate-500 text-sm font-medium mb-1">
-            {activeTab === 'my' ? '나의 ' : '그룹 '}총 지출
-          </p>
-          <h3 className="text-3xl font-bold tracking-tight mb-6">{formatAmount(totalExpense)}</h3>
+        {loading ? (
+          <div className="p-8 text-center text-slate-400">로딩 중...</div>
+        ) : (
+          <>
+          {/* Summary & Pie Chart */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-800">
+            <p className="text-slate-500 text-sm font-medium mb-1">
+              {activeTab === 'my' ? '나의 ' : '그룹 '}총 지출
+            </p>
+            <h3 className="text-3xl font-bold tracking-tight mb-6">{formatAmount(totalExpense)}</h3>
 
-          <div className="relative h-48 w-full flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData.length > 0 ? chartData : [{ name: '데이터 없음', value: 1, color: '#f1f5f9' }]}
-                  innerRadius={65} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none"
-                >
-                  {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  {chartData.length === 0 && <Cell fill="#f1f5f9" />}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute flex flex-col items-center">
-              <span className="text-slate-400 text-[10px] font-bold uppercase">최다 지출</span>
-              <span className="text-lg font-bold">{chartData[0]?.name || '-'}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mt-8">
-            {chartData.slice(0, 4).map(item => (
-              <div key={item.name} className="flex items-center gap-2">
-                <div className="size-3 rounded-full" style={{ backgroundColor: item.color }} />
-                <div className="min-w-0">
-                  <p className="text-[10px] text-slate-500 truncate">{item.name}</p>
-                  <p className="text-xs font-bold truncate">{formatAmount(item.value)}</p>
-                </div>
+            <div className="relative h-48 w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData.length > 0 ? chartData : [{ name: '데이터 없음', value: 1, color: '#f1f5f9' }]}
+                    innerRadius={65} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none"
+                  >
+                    {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    {chartData.length === 0 && <Cell fill="#f1f5f9" />}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute flex flex-col items-center">
+                <span className="text-slate-400 text-[10px] font-bold uppercase">최다 지출</span>
+                <span className="text-lg font-bold">{chartData[0]?.name || '-'}</span>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Trend Chart */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-800">
-          <h2 className="text-base font-bold mb-4">최근 6개월 추이</h2>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month_label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                <YAxis hide />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
-                <Bar dataKey="income" name="수입" fill="#10b981" radius={[4, 4, 0, 0]} barSize={12} />
-                <Bar dataKey="expense" name="지출" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={12} />
-                <Line type="monotone" dataKey="balance" name="잔액" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Member Ranking (Group only) */}
-        {activeTab === 'group' && memberRanking.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold px-1">구성원별 지출</h2>
-            <div className="space-y-3">
-              {memberRanking.map(member => (
-                <div key={member.user_id} className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold text-sm">{member.display_name}</span>
-                    <span className="font-bold text-sm">{formatAmount(member.total)}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${member.percentage}%` }} />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 w-8">{member.percentage}%</span>
+            <div className="grid grid-cols-2 gap-4 mt-8">
+              {chartData.slice(0, 4).map(item => (
+                <div key={item.name} className="flex items-center gap-2">
+                  <div className="size-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-500 truncate">{item.name}</p>
+                    <p className="text-xs font-bold truncate">{formatAmount(item.value)}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Trend Chart */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-800">
+            <h2 className="text-base font-bold mb-4">최근 6개월 추이</h2>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month_label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis hide />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                  <Bar dataKey="income" name="수입" fill="#10b981" radius={[4, 4, 0, 0]} barSize={12} />
+                  <Bar dataKey="expense" name="지출" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={12} />
+                  <Line type="monotone" dataKey="balance" name="잔액" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Member Ranking (Group only) */}
+          {activeTab === 'group' && memberRanking.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold px-1">구성원별 지출</h2>
+              <div className="space-y-3">
+                {memberRanking.map(member => (
+                  <div key={member.user_id} className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-bold text-sm">{member.display_name}</span>
+                      <span className="font-bold text-sm">{formatAmount(member.total)}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${member.percentage}%` }} />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-400 w-8">{member.percentage}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
 

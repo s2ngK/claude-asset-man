@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+/.idea/
 
 # debug
 npm-debug.log*
@@ -47,3 +48,10 @@ backend/**/__pycache__
 backend/data/*.db
 backend/data/*.db-journal
 *.pyc
+
+# next-pwa (generated into public/ at build time)
+/public/sw.js
+/public/sw.js.map
+/public/workbox-*.js
+/public/workbox-*.js.map
+/public/swe-worker-*.js
