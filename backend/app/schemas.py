@@ -22,6 +22,10 @@ class TokenResponse(BaseModel):
     user_id: str
     group_id: str
     display_name: str
+    # 토큰의 exp 를 그대로 내려준다. 클라이언트가 쿠키 수명을 이 값에서 계산하므로
+    # 쿠키와 JWT 가 **같은 출처**를 갖는다 — 예전엔 쿠키 30일이 하드코딩돼 있어
+    # TOKEN_EXPIRE_DAYS 를 줄이면 둘이 어긋났다.
+    expires_at: datetime
 
 
 class UserResponse(BaseModel):
