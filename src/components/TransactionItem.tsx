@@ -7,11 +7,17 @@ import { cn } from '@/lib/utils';
 
 interface TransactionItemProps {
   item: Transaction;
+  /**
+   * 내가 쓴 내역인가. 아니면 **수정도 삭제도 열지 않는다.**
+   * 서버가 어차피 403 을 주므로(→ docs/auth-and-scoping.md) 눌러볼 수 있게 두면
+   * 목록이 한 번 깜빡였다가 알림이 뜨는 것으로 끝난다. 제스처 단계에서 막는다.
+   */
+  isMine: boolean;
   onDelete: () => void;
   onEdit?: () => void;
 }
 
-const TransactionItem: React.FC<TransactionItemProps> = ({ item, onDelete, onEdit }) => {
+const TransactionItem: React.FC<TransactionItemProps> = ({ item, isMine, onDelete, onEdit }) => {
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
 
@@ -116,8 +122,8 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, onDelete, onEdi
 
   return (
     <div className="relative overflow-hidden group select-none bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 last:border-0">
-      {/* Background Delete Action - Revealed on swipe */}
-      <div 
+      {/* Background Delete Action - Revealed on swipe. 내 내역일 때만 존재한다. */}
+      {isMine && <div 
         className="absolute inset-y-0 right-0 bg-[#f43f5e] flex items-center justify-end overflow-hidden transition-opacity duration-200"
         style={{ width: `${Math.max(offset, 0)}px`, opacity: offset > 20 ? 1 : 0 }}
       >
@@ -132,7 +138,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, onDelete, onEdi
           <span className="material-symbols-outlined text-[20px]">delete</span>
           <span className="text-[11px] font-bold">삭제</span>
         </button>
-      </div>
+      </div>}
 
       {/* Foreground Content */}
       <div 
@@ -141,6 +147,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, onDelete, onEdi
             swallowClick.current = false;
             return;
           }
+          if (!isMine) return;
           if (offset === 0) {
             onEdit?.();
           } else {
@@ -148,16 +155,17 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, onDelete, onEdi
           }
         }}
         className={cn(
-          "relative bg-white dark:bg-slate-900 flex items-center gap-4 px-4 min-h-[72px] py-2 justify-between cursor-pointer active:bg-slate-50 dark:active:bg-slate-800",
+          "relative bg-white dark:bg-slate-900 flex items-center gap-4 px-4 min-h-[72px] py-2 justify-between",
+          isMine && "cursor-pointer active:bg-slate-50 dark:active:bg-slate-800",
           // 끄는 동안엔 전환을 끈다. 안 그러면 200ms 씩 뒤따라와 손에 안 붙는다.
           !dragging && "transition-transform duration-200 ease-out"
         )}
         // pan-y: 세로 스크롤은 브라우저에 넘기고 가로 제스처만 우리가 받는다.
         style={{ transform: `translateX(-${offset}px)`, touchAction: 'pan-y' }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerCancel}
+        onPointerDown={isMine ? onPointerDown : undefined}
+        onPointerMove={isMine ? onPointerMove : undefined}
+        onPointerUp={isMine ? onPointerUp : undefined}
+        onPointerCancel={isMine ? onPointerCancel : undefined}
       >
         <div className="flex items-center gap-4">
           <div 
@@ -171,7 +179,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, onDelete, onEdi
               {item.description || item.categories?.name}
             </p>
             <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-normal mt-0.5">
-              {item.date} • {item.profiles?.full_name || '나'}
+              {item.date} • {isMine ? '나' : (item.user_display_name || '알 수 없음')}
             </p>
           </div>
         </div>

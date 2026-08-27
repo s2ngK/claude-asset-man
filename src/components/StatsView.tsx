@@ -6,6 +6,27 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { getCategoryStats, getTrend, getMemberStats, type CategoryStat, type TrendItem, type MemberStat } from '@/lib/api';
 
+const formatAmount = (amount: number) => new Intl.NumberFormat('ko-KR').format(amount) + '원';
+
+type Slice = { name: string; value: number; color: string; percentage: number };
+
+/** 조각을 짚으면 이름·금액·점유율을 함께 보여준다.
+ *
+ *  카테고리 색 중에는 흰 카드 위에서 대비가 3:1 에 못 미치는 것이 있어(연한 초록·하늘색),
+ *  색만으로는 어느 조각인지 못 읽는다. 범례와 이 툴팁이 그걸 글자로 받쳐준다. */
+const SliceTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: Slice }> }) => {
+  if (!active || !payload?.length) return null;
+  const slice = payload[0].payload;
+  return (
+    <div className="rounded-xl bg-white dark:bg-slate-800 px-3 py-2 shadow-lg border border-slate-100 dark:border-slate-700">
+      <p className="text-xs font-bold text-slate-900 dark:text-white">{slice.name}</p>
+      <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+        {formatAmount(slice.value)} · {slice.percentage}%
+      </p>
+    </div>
+  );
+};
+
 export default function StatsView() {
   const [activeTab, setActiveTab] = useState<'my' | 'group'>('my');
   const [loading, setLoading] = useState(true);
@@ -36,8 +57,13 @@ export default function StatsView() {
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
   const totalExpense = categoryData.reduce((s, c) => s + c.total, 0);
-  const formatAmount = (amount: number) => new Intl.NumberFormat('ko-KR').format(amount) + '원';
-  const chartData = categoryData.map(c => ({ name: c.category_name, value: c.total, color: c.color || '#808080' }));
+  // percentage 는 서버가 이미 계산해서 내려준다 (GET /api/stats/categories).
+  const chartData: Slice[] = categoryData.map(c => ({
+    name: c.category_name,
+    value: c.total,
+    color: c.color || '#808080',
+    percentage: c.percentage,
+  }));
 
   return (
     <div className="min-h-screen pb-24 bg-slate-50 dark:bg-slate-950">
@@ -92,8 +118,9 @@ export default function StatsView() {
             <div className="relative h-48 w-full flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
+                  {chartData.length > 0 && <Tooltip content={<SliceTooltip />} />}
                   <Pie
-                    data={chartData.length > 0 ? chartData : [{ name: '데이터 없음', value: 1, color: '#f1f5f9' }]}
+                    data={chartData.length > 0 ? chartData : [{ name: '데이터 없음', value: 1, color: '#f1f5f9', percentage: 0 }]}
                     innerRadius={65} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none"
                   >
                     {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
@@ -101,19 +128,27 @@ export default function StatsView() {
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
-              <div className="absolute flex flex-col items-center">
+              <div className="absolute flex flex-col items-center pointer-events-none">
                 <span className="text-slate-400 text-[10px] font-bold uppercase">최다 지출</span>
                 <span className="text-lg font-bold">{chartData[0]?.name || '-'}</span>
+                {chartData[0] && (
+                  <span className="text-slate-500 dark:text-slate-400 text-xs font-bold">{chartData[0].percentage}%</span>
+                )}
               </div>
             </div>
 
+            {/* 상위 4개만 보여주면 나머지가 합쳐서 몇 %인지 알 수 없다. 카테고리는 많아야
+                예닐곱 개라 전부 적는 편이 낫다. */}
             <div className="grid grid-cols-2 gap-4 mt-8">
-              {chartData.slice(0, 4).map(item => (
+              {chartData.map(item => (
                 <div key={item.name} className="flex items-center gap-2">
-                  <div className="size-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <div className="size-3 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
                   <div className="min-w-0">
                     <p className="text-[10px] text-slate-500 truncate">{item.name}</p>
-                    <p className="text-xs font-bold truncate">{formatAmount(item.value)}</p>
+                    <p className="text-xs font-bold truncate">
+                      {formatAmount(item.value)}
+                      <span className="ml-1 font-medium text-slate-400">{item.percentage}%</span>
+                    </p>
                   </div>
                 </div>
               ))}

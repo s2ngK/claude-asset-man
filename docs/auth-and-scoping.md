@@ -32,6 +32,22 @@ exp       만료 (TOKEN_EXPIRE_DAYS, 기본 30일)
 > 환경변수를 빠뜨린 채 배포하면 **공개된 문자열로 서명된 JWT**를 쓰게 되고 누구나 토큰을 위조할 수 있다.
 > → [#12](https://github.com/s2ngK/claude-asset-man/issues/12) · [결함 목록](known-issues.md)
 
+## 남의 내역은 화면에서도 열리지 않는다
+
+서버가 403 을 주는 것(`_own_transaction`)과 별개로, **목록에서 수정·삭제 제스처 자체가
+열리지 않는다.** `TransactionItem` 이 `isMine` 을 받아 자기 것이 아니면
+
+- 포인터 핸들러를 아예 붙이지 않는다 → 왼쪽으로 끌어도 삭제 버튼이 안 나온다
+- 삭제 배경을 렌더하지도 않는다 → DOM 에 없다
+- 눌러도 수정 모달이 열리지 않는다
+
+서버 검증을 대신하는 게 아니라 **눌러볼 수 있게 두지 않는 것**이다. 예전에는 남의 내역도
+스와이프하면 [삭제] 가 나왔고, 누르면 목록에서 사라졌다가 403 을 받고 되돌아오며 알림이
+떴다 → [#30](https://github.com/s2ngK/claude-asset-man/issues/30)
+
+작성자 이름도 같은 이유로 필요하다. 전부 `나` 로 보이면 왜 어떤 것만 안 되는지 알 수 없다
+→ [#31](https://github.com/s2ngK/claude-asset-man/issues/31)
+
 # 그룹 격리 — 지켜야 할 불변식
 
 > [!IMPORTANT] 모든 데이터 접근은 `current_user.group_id`로 필터링되어야 한다

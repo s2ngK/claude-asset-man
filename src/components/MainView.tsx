@@ -30,6 +30,7 @@ function toLocalTx(t: ApiTransaction): Transaction {
     description: t.description ?? '',
     date: t.date,
     created_at: t.created_at ?? '',
+    user_display_name: t.user_display_name ?? undefined,
     categories: t.category_name ? { id: t.category_id, name: t.category_name, icon: t.category_icon ?? '', color: t.category_color ?? '' } : null,
   };
 }
@@ -296,8 +297,9 @@ export default function MainView() {
               </div>
               {items.map(item => (
                 <TransactionItem key={item.id} item={item}
+                  isMine={item.user_id === user?.id}
                   onDelete={() => handleDelete(item.id)}
-                  onEdit={item.user_id === user?.id ? () => setEditing(item) : undefined} />
+                  onEdit={() => setEditing(item)} />
               ))}
             </div>
           ))
