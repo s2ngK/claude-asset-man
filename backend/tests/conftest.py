@@ -111,3 +111,29 @@ def own_group_category(db_session, group):
     db_session.add(c)
     db_session.commit()
     return c
+
+
+@pytest.fixture()
+def group_mate(db_session, group):
+    """같은 그룹의 다른 구성원. 목록에는 보이지만 남의 내역은 못 고친다."""
+    u = models.User(id="mate-user", group_id=group.id, display_name="같은그룹동료", invite_code="MATECODE1")
+    db_session.add(u)
+    db_session.commit()
+    return u
+
+
+@pytest.fixture()
+def mate_transaction(db_session, group_mate, category):
+    tx = models.Transaction(
+        id="mate-transaction",
+        group_id=group_mate.group_id,
+        user_id=group_mate.id,
+        category_id=category.id,
+        type="expense",
+        amount=7000,
+        description="동료의 점심",
+        date="2026-07-05",
+    )
+    db_session.add(tx)
+    db_session.commit()
+    return tx
