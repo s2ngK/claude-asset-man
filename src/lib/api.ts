@@ -85,7 +85,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-export interface AuthUser { id: string; group_id: string; display_name: string; }
+export interface AuthUser { id: string; group_id: string; display_name: string; is_group_admin: boolean; }
 // /api/auth/login 응답은 `id`가 아니라 `user_id`를 돌려줌 (backend/app/schemas.py TokenResponse)
 export interface TokenResponse { access_token: string; token_type: string; user_id: string; group_id: string; display_name: string; expires_at: string; }
 
@@ -162,6 +162,18 @@ export interface MonthlySummary { income: number; expense: number; balance: numb
 export interface CategoryStat { category_id: string; category_name: string; icon: string | null; color: string | null; total: number; percentage: number; }
 export interface TrendItem { month: string; income: number; expense: number; }
 export interface MemberStat { user_id: string; display_name: string; total: number; percentage: number; }
+
+export async function createCategory(data: {
+  type: 'income' | 'expense'; name: string; icon?: string;
+}): Promise<Category> {
+  // 색은 보내지 않는다 — 서버가 검증된 팔레트에서 배정한다 (docs/stats-rules.md).
+  return request<Category>('/api/categories', { method: 'POST', body: JSON.stringify(data) });
+}
+
+/** 그룹 전용 카테고리를 지운다. 붙어 있던 거래는 **`기타` 로 옮겨지고 남는다.** */
+export async function deleteCategory(id: string): Promise<void> {
+  return request<void>(`/api/categories/${id}`, { method: 'DELETE' });
+}
 
 export async function getSummary(month: string, userOnly = false): Promise<MonthlySummary> {
   return request<MonthlySummary>(`/api/stats/summary?month=${month}&user_only=${userOnly}`);

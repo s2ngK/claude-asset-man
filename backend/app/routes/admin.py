@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from jose import jwt
 from sqlalchemy.orm import Session
 
-from .. import config, models, schemas
+from .. import config, models, palette, schemas
 from ..database import get_db
 from ..dependencies import ADMIN_SCOPE, GROUP_ADMIN_SCOPE, AdminIdentity, resolve_admin
+from ..queries import FALLBACK_CATEGORY_NAME, move_transactions_to_fallback
 from ..rate_limit import limiter
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -287,3 +288,101 @@ def regenerate_invite_code(
     db.commit()
     db.refresh(user)
     return {"id": user.id, "display_name": user.display_name, "invite_code": user.invite_code}
+
+
+# ── 공통 카테고리 ────────────────────────────────────────────────────────────
+#
+# `group_id IS NULL` 인 카테고리다. **모든 그룹이 함께 본다** — 여기서 하나를 지우면
+# 그 카테고리를 쓰던 모든 그룹의 거래가 `기타` 로 옮겨간다. 전체 관리자만 만질 수 있다.
+
+
+def _system_categories(db: Session):
+    return db.query(models.Category).filter(models.Category.group_id.is_(None))
+
+
+@router.get("/categories", response_model=list[schemas.CategoryResponse])
+@limiter.limit("10/minute")
+def list_system_categories(
+    request: Request,
+    x_admin_key: str | None = Header(None),
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db),
+):
+    admin = resolve_admin(x_admin_key, authorization, db)
+    admin.require_super()
+    return _system_categories(db).order_by(models.Category.type, models.Category.name).all()
+
+
+@router.post("/categories", response_model=schemas.CategoryResponse, status_code=201)
+@limiter.limit("10/minute")
+def create_system_category(
+    request: Request,
+    payload: schemas.CategoryCreate,
+    x_admin_key: str | None = Header(None),
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db),
+):
+    """공통 카테고리를 만든다. 색은 그룹 카테고리와 같은 규칙으로 서버가 배정한다."""
+    admin = resolve_admin(x_admin_key, authorization, db)
+    admin.require_super()
+
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="이름을 입력해 주세요.")
+    duplicate = (
+        _system_categories(db).filter(models.Category.type == payload.type, models.Category.name == name).first()
+    )
+    if duplicate:
+        raise HTTPException(status_code=409, detail=f"이미 있는 공통 카테고리입니다: {name}")
+
+    used = [c.color for c in _system_categories(db).all()]
+    category = models.Category(
+        id=str(uuid.uuid4()),
+        group_id=None,
+        type=payload.type,
+        name=name,
+        icon=payload.icon or None,
+        color=palette.next_color(used),
+        is_default=True,
+    )
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+@router.delete("/categories/{category_id}", status_code=204)
+@limiter.limit("10/minute")
+def delete_system_category(
+    request: Request,
+    category_id: str,
+    x_admin_key: str | None = Header(None),
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db),
+):
+    """공통 카테고리를 지운다. **모든 그룹의 해당 거래가 `기타` 로 옮겨간다.**
+
+    그룹 전용 카테고리 삭제와 같은 방침이다 (#41) — 거래는 남고 분류만 잃는다.
+    다만 영향 범위가 그룹 하나가 아니라 전부다.
+    """
+    admin = resolve_admin(x_admin_key, authorization, db)
+    admin.require_super()
+
+    category = _system_categories(db).filter(models.Category.id == category_id).first()
+    if not category:
+        # 그룹 전용 카테고리는 여기서 못 지운다 — 그 그룹의 관리자 몫이다.
+        raise HTTPException(status_code=404, detail="공통 카테고리를 찾을 수 없습니다.")
+
+    # `기타` 는 다른 카테고리를 지울 때 **옮겨 둘 자리**다. 이걸 지우면 그 뒤로는
+    # 어떤 카테고리도 지울 수 없게 된다.
+    if category.name == FALLBACK_CATEGORY_NAME:
+        raise HTTPException(
+            status_code=409,
+            detail="`기타` 는 다른 카테고리를 지울 때 옮겨 둘 자리라 지울 수 없습니다.",
+        )
+
+    if not move_transactions_to_fallback(db, category, _system_categories(db)):
+        raise HTTPException(status_code=409, detail="옮겨 둘 `기타` 카테고리가 없어 삭제할 수 없습니다.")
+
+    db.delete(category)
+    db.commit()
