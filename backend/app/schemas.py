@@ -16,6 +16,16 @@ class LoginRequest(BaseModel):
     invite_code: str
 
 
+class AdminLoginRequest(BaseModel):
+    admin_key: str
+
+
+class AdminTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_at: datetime
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

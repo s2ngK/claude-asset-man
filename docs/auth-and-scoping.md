@@ -22,7 +22,9 @@ exp       만료 (TOKEN_EXPIRE_DAYS, 기본 30일)
 알고리즘은 HS256, 키는 `JWT_SECRET` 환경변수.
 
 ## 이 모델의 성질
-- **비밀번호 변경이 없다.** 초대 코드가 유출되면 관리자가 새 사용자를 만드는 수밖에 없다
+- **비밀번호 변경이 없다.** 대신 관리자가 **초대 코드를 재발급**할 수 있다
+  (→ [관리자 화면](admin-console.md)). 예전 코드는 즉시 죽지만, 그 코드로 이미 발급된
+  JWT 는 만료까지 살아 있다
 - **로그아웃은 클라이언트에서만 일어난다.** 토큰 폐기(revocation) 목록이 없어서, 발급된 JWT는 만료까지 유효하다
 - **리프레시 토큰이 없다.** 30일 뒤 다시 초대 코드를 넣어야 한다
 - `GET /api/admin/users`는 **모든 사용자의 초대 코드를 평문으로 반환한다.** 사실상 전 계정 비밀번호 목록이다. 관리자 키로 보호되고 rate limit도 걸려 있다
@@ -160,6 +162,21 @@ def visible_categories(db: Session, group_id: str) -> Query[models.Category]:
 > 안 그러면 코드를 잘못 친 것만으로 화면이 리다이렉트된다.
 
 → [#11](https://github.com/s2ngK/claude-asset-man/issues/11)
+
+# 관리자 인증
+
+관리자 API 는 **`X-Admin-Key` 원문 또는 `scope=admin` 토큰** 둘 다 받는다.
+브라우저(`/admin`)는 토큰을, 스크립트·`curl` 은 키를 쓴다 → [관리자 화면](admin-console.md)
+
+두 토큰은 같은 시크릿으로 서명하지만 **`scope` 로 갈린다.**
+
+- `get_current_user` — `scope == "admin"` 이면 401. 관리자 토큰으로 사용자 API 를 못 쓴다
+- `check_admin_auth` — `scope` 가 `admin` 이 아니면 통과 못 한다. 사용자 토큰으로 관리자 API 를 못 쓴다
+
+관리자 토큰 수명은 `ADMIN_TOKEN_EXPIRE_MINUTES`(기본 60분)로, 사용자 토큰(30일)보다 훨씬
+짧다. 이 토큰 하나로 모든 그룹을 만들고 볼 수 있기 때문이다.
+
+키 비교는 `secrets.compare_digest` 로 한다.
 
 # rate limit과 `Depends`의 함정
 

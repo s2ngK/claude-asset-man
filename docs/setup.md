@@ -90,6 +90,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | `ALLOWED_ORIGINS` | `http://localhost:3000` | `*` 는 프로덕션에서 거부 |
 | `DATABASE_URL` | `sqlite:///./data/ledger.db` | |
 | `TOKEN_EXPIRE_DAYS` | `30` | 로그인 응답의 `expires_at` 으로 나가 쿠키 수명이 여기 맞춰진다 |
+| `ADMIN_TOKEN_EXPIRE_MINUTES` | `60` | `/admin` 이 받는 관리자 토큰 수명 |
 | `SQL_ECHO` | `false` | 쿼리 로깅 |
 
 ## 기동 시 설정 검증
@@ -128,7 +129,7 @@ cd backend && uv run pytest
 |---|---|---|
 | `auth.py` | 8 | 로그인 성공/실패, 토큰 검증, 만료 시각, rate limit |
 | `transactions.py` | 4 | CRUD, 없는 카테고리 거부, 그룹 스코핑 |
-| `admin.py` | 5 | 헤더 인증, 구 방식 거부, 브루트포스 rate limit |
+| `admin.py` | 14 | 헤더·토큰 인증, 두 토큰의 상호 거부, 초대 코드 재발급, rate limit |
 | `config.py` | 9 | 기본 시크릿 탐지, 프로덕션 기동 거부 |
 | `stats.py` | 16 | 그룹/개인 집계, 지출만 세기, 퍼센트·정렬, 추이 6개월 창 |
 | `categories.py` | 5 | 시스템 기본값, 자기 그룹 전용, 다른 그룹 격리, 정렬 |
