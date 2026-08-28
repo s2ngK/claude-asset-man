@@ -8,6 +8,8 @@ import {
 } from '@/lib/api';
 import { getErrorMessage } from '@/lib/utils';
 import { useLocalUser } from '@/lib/useLocalUser';
+import AppNav, { SIDEBAR_WIDTH } from '@/components/AppNav';
+import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { TransactionType } from '@/types';
 
@@ -22,7 +24,7 @@ export default function SettingsView() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-24">
+    <div className={cn('min-h-screen bg-slate-50 dark:bg-slate-950 pb-24 lg:pb-8', SIDEBAR_WIDTH)}>
       <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 p-4 flex items-center gap-3">
         <Link href="/" className="text-slate-500">
           <span className="material-symbols-outlined">arrow_back</span>
@@ -30,7 +32,7 @@ export default function SettingsView() {
         <h2 className="text-lg font-bold">설정</h2>
       </header>
 
-      <main className="max-w-md mx-auto p-4 space-y-8">
+      <main className="max-w-md lg:max-w-3xl mx-auto p-4 space-y-8">
         {/* Profile Section */}
         <section className="space-y-4">
           <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">내 프로필</h3>
@@ -59,6 +61,7 @@ export default function SettingsView() {
           </div>
         </section>
       </main>
+      <AppNav />
     </div>
   );
 }

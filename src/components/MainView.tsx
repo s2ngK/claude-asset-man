@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import AddEntryModal from '@/components/AddEntryModal';
+import AppNav, { SIDEBAR_WIDTH } from '@/components/AppNav';
 import TransactionItem from '@/components/TransactionItem';
 import UndoToast from '@/components/UndoToast';
 import { Transaction, TransactionType } from '@/types';
@@ -199,9 +200,9 @@ export default function MainView() {
   const filteredSummary = useMemo(() => totals(visibleTransactions), [visibleTransactions]);
 
   return (
-    <div className="relative min-h-screen pb-24 bg-slate-50 dark:bg-slate-950">
+    <div className={cn('relative min-h-screen pb-24 bg-slate-50 dark:bg-slate-950 lg:pb-8', SIDEBAR_WIDTH)}>
       <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 p-4">
-        <div className="flex items-center justify-between max-w-md mx-auto">
+        <div className="flex items-center justify-between max-w-md lg:max-w-5xl mx-auto">
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               {/* required 를 주면 크롬 월 선택기에서 [삭제](지우기)가 사라진다. 값을 비우면
@@ -224,7 +225,11 @@ export default function MainView() {
         </div>
       </header>
 
-      <div className="p-4 max-w-md mx-auto">
+      {/* 넓은 화면에서는 왼쪽에 "이 달이 어떤 상황인가"(요약·필터), 오른쪽에 목록을 둔다.
+          좁은 화면에서는 지금처럼 위아래로 쌓인다. */}
+      <div className="mx-auto w-full max-w-md lg:max-w-5xl lg:grid lg:grid-cols-[20rem_1fr] lg:gap-6 lg:items-start lg:px-4">
+      <div className="lg:sticky lg:top-[89px]">
+      <div className="p-4 lg:px-0">
         <div className="rounded-2xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-4">
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">이번 달 잔액</p>
@@ -246,7 +251,7 @@ export default function MainView() {
         </div>
       </div>
 
-      <div className="px-4 pb-3 max-w-md mx-auto flex items-center gap-2 flex-wrap">
+      <div className="px-4 lg:px-0 pb-3 flex items-center gap-2 flex-wrap">
         <div className="flex rounded-xl bg-slate-100 dark:bg-slate-900 p-1">
           {([['all', '전체'], ['income', '수입'], ['expense', '지출']] as const).map(([value, label]) => (
             <button key={value} onClick={() => changeTypeFilter(value)}
@@ -269,21 +274,24 @@ export default function MainView() {
         </select>
 
         <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
-          className="ml-auto flex items-center gap-1 h-8 px-3 rounded-xl bg-slate-100 dark:bg-slate-900 text-xs font-bold text-slate-600 dark:text-slate-300">
+          className="ml-auto lg:ml-0 flex items-center gap-1 h-8 px-3 rounded-xl bg-slate-100 dark:bg-slate-900 text-xs font-bold text-slate-600 dark:text-slate-300">
           <span className="material-symbols-outlined text-[16px]">swap_vert</span>
           {sortOrder === 'newest' ? '최신순' : '오래된순'}
         </button>
       </div>
 
+      </div>
+
+      <div className="lg:pt-4">
       {filterActive && (
-        <p className="px-4 pb-2 max-w-md mx-auto text-[11px] font-bold text-slate-500 dark:text-slate-400">
+        <p className="px-4 lg:px-0 pb-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">
           필터 결과 {visibleTransactions.length}건
           {filteredSummary.income > 0 && ` · 수입 ${new Intl.NumberFormat('ko-KR').format(filteredSummary.income)}원`}
           {filteredSummary.expense > 0 && ` · 지출 ${new Intl.NumberFormat('ko-KR').format(filteredSummary.expense)}원`}
         </p>
       )}
 
-      <main className="max-w-md mx-auto">
+      <main className="lg:rounded-2xl lg:overflow-hidden lg:border lg:border-slate-200 lg:dark:border-slate-800">
         {loading && transactions.length === 0 ? (
           <div className="p-8 text-center text-slate-400">로딩 중...</div>
         ) : visibleTransactions.length === 0 ? (
@@ -302,7 +310,7 @@ export default function MainView() {
         ) : (
           groupedTransactions.map(([date, items]) => (
             <div key={date}>
-              <div className="sticky top-[73px] z-20 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-2 px-4 border-b border-slate-100 dark:border-slate-800/50 flex justify-between items-center">
+              <div className="sticky lg:static top-[73px] z-20 bg-slate-50/95 dark:bg-slate-950/95 lg:bg-slate-50 lg:dark:bg-slate-900/60 backdrop-blur-sm py-2 px-4 border-b border-slate-100 dark:border-slate-800/50 flex justify-between items-center">
                 <h3 className="text-xs font-bold">{date}</h3>
                 <span className="text-[10px] text-slate-400">{items.length}건</span>
               </div>
@@ -316,24 +324,16 @@ export default function MainView() {
           ))
         )}
       </main>
+      </div>
+      </div>
 
+      {/* 아래 탭바가 없는 넓은 화면에서는 버튼을 더 아래로 내린다 */}
       <button onClick={() => setIsAddEntryOpen(true)}
-        className="fixed right-6 bottom-24 z-40 flex items-center justify-center rounded-full size-14 bg-emerald-500 text-white shadow-lg active:scale-95 transition-transform">
+        className="fixed right-6 bottom-24 lg:bottom-8 lg:right-8 z-40 flex items-center justify-center rounded-full size-14 bg-emerald-500 text-white shadow-lg active:scale-95 transition-transform">
         <span className="material-symbols-outlined text-[32px]">add</span>
       </button>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 z-40">
-        <div className="flex justify-around items-center h-16 max-w-md mx-auto px-6">
-          <Link href="/" className="flex flex-col items-center gap-1 text-emerald-500">
-            <span className="material-symbols-outlined text-[24px]">home</span>
-            <span className="text-[10px] font-bold">홈</span>
-          </Link>
-          <Link href="/stats" className="flex flex-col items-center gap-1 text-slate-400">
-            <span className="material-symbols-outlined text-[24px]">insights</span>
-            <span className="text-[10px] font-medium">통계</span>
-          </Link>
-        </div>
-      </nav>
+      <AppNav />
 
       {(isAddEntryOpen || editing) && (
         <AddEntryModal
