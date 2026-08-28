@@ -159,6 +159,20 @@ echo back** 했다. `JWT_SECRET`·`ADMIN_KEY` 도 공개된 문자열이 기본�
 > 그러면 compose 로 띄운 서버가 "설정을 안 했다" 는 판정을 그대로 빠져나간다.
 > `config.PLACEHOLDER_JWT_SECRETS` 가 옛 문자열까지 들고 있는 이유다.
 
+## `localStorage` 를 렌더 중에 읽으면 하이드레이션이 깨진다
+
+`localStorage` 는 서버에 없다. 렌더 본문에서 읽으면 서버 HTML 은 빈 값이고 첫 클라이언트
+렌더는 실제 값이라 React 가 불일치로 본다 (#16).
+
+`useEffect` 로 옮기는 것도 방법이지만, 이 저장소의 ESLint 는 **effect 안에서의 setState 를
+막는다**(`react-hooks/set-state-in-effect`). React 가 정해둔 답은 `useSyncExternalStore` 다 —
+`src/lib/useLocalUser.ts` 가 그 형태다. 서버 스냅샷을 명시적으로 `null` 로 주면 서버와 첫
+클라이언트 렌더가 같아진다.
+
+> [!WARNING] `getSnapshot` 은 같은 객체를 돌려줘야 한다
+> 매번 새 객체를 만들면 React 가 계속 바뀐 것으로 보고 **무한 렌더**에 빠진다.
+> `useLocalUser` 가 키를 만들어 캐시하는 이유다.
+
 # 스키마 변경
 
 `create_all()`을 쓰지 않는다. **Alembic이 유일한 스키마 관리 수단이다.**

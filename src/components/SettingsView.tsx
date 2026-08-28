@@ -2,12 +2,13 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { logout, getLocalUser } from '@/lib/api';
+import { logout } from '@/lib/api';
+import { useLocalUser } from '@/lib/useLocalUser';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsView() {
   const router = useRouter();
-  const user = getLocalUser();
+  const user = useLocalUser();
 
   const handleLogout = () => {
     logout();
