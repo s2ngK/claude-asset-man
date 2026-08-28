@@ -45,6 +45,12 @@ def admin_key() -> str:
     return os.getenv("ADMIN_KEY", DEFAULT_ADMIN_KEY)
 
 
+def admin_token_expire_minutes() -> int:
+    """관리자 토큰 수명. 사용자 토큰(30일)보다 훨씬 짧게 둔다 —
+    이 토큰 하나로 **모든 그룹**을 만들고 볼 수 있기 때문이다."""
+    return int(os.getenv("ADMIN_TOKEN_EXPIRE_MINUTES", "60"))
+
+
 def allowed_origins() -> list[str]:
     raw = os.getenv("ALLOWED_ORIGINS", DEFAULT_ALLOWED_ORIGINS)
     return [origin.strip() for origin in raw.split(",") if origin.strip()]

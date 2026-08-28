@@ -25,6 +25,11 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
   const hasValidToken = token !== undefined && !isExpired(token);
   const isLoginPage = request.nextUrl.pathname.startsWith('/login');
+  // 관리자 화면은 **사용자 로그인과 무관하다.** 자기 인증(관리자 토큰)을 따로 하고,
+  // 그 토큰은 sessionStorage 에 있어 여기서는 보이지도 않는다. 그냥 통과시킨다.
+  const isAdminPage = request.nextUrl.pathname.startsWith('/admin');
+
+  if (isAdminPage) return NextResponse.next();
 
   if (!hasValidToken && !isLoginPage) {
     const url = new URL('/login', request.url);
