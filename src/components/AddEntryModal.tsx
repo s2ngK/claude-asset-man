@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { TransactionType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -83,6 +83,13 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
 
   const canSave = amountToSave > 0 && categoriesReady && selectedCatId !== '';
 
+  // Esc 로도 닫는다. 바깥을 눌러 닫는 다이얼로그에서 키보드만 안 먹으면 앞뒤가 안 맞는다.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   const handleDone = () => {
     if (!canSave) return; // 금액은 서버 스키마가 > 0 을 요구하고, 카테고리는 id 가 있어야 한다
     onSave(amountToSave, selectedCatId, description, type, date);
@@ -92,7 +99,12 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
   return (
     /* 좁은 화면에서는 아래에서 올라오는 전체 화면, 넓은 화면에서는 가운데 뜨는 다이얼로그.
        넓은 화면에서 전체를 덮으면 뒤 목록이 사라져 방금 무엇을 보고 있었는지 잃는다. */
-    <div className="fixed inset-0 z-50 flex sm:items-center sm:justify-center sm:bg-slate-900/40 sm:backdrop-blur-sm">
+    <div
+      /* 바깥(=이 요소 자신)을 눌렀을 때만 닫는다. 안에서 눌렀다가 밖에서 손을 뗀 경우까지
+         닫으면, 금액을 드래그 선택하다 창이 사라진다. */
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex sm:items-center sm:justify-center sm:bg-slate-900/40 sm:backdrop-blur-sm"
+    >
     <div className="flex flex-col w-full h-full bg-white dark:bg-slate-950 animate-in slide-in-from-bottom duration-300
                     sm:h-auto sm:max-h-[92vh] sm:w-[26rem] sm:rounded-3xl sm:shadow-2xl sm:overflow-hidden sm:zoom-in-95">
       <div className="flex justify-center pt-3 pb-1">

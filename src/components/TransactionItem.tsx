@@ -183,13 +183,33 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, isMine, onDelet
             </p>
           </div>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 flex items-center gap-2">
           <p className={cn(
-            "text-[15px] font-bold leading-normal",
+            "text-[15px] font-bold leading-normal text-right",
             item.type === 'income' ? "text-emerald-500" : "text-slate-900 dark:text-white"
           )}>
             {item.type === 'income' ? '+' : '-'}{formatAmount(item.amount)}
           </p>
+
+          {/* 넓은 화면에서 마우스를 올리면 삭제가 **살짝** 드러난다.
+              끌어서 여는 제스처는 손가락에는 자연스럽지만 마우스에는 보이지 않는다 —
+              끌 수 있다는 것을 알려주는 표시가 없어서, 데스크톱에서는 삭제에 닿을
+              길이 사실상 없었다 (→ docs/responsive-layout.md).
+              좁은 화면에는 내보내지 않는다. 거기서는 스와이프가 이미 자연스럽고,
+              터치에는 hover 가 없어 항상 떠 있게 된다. */}
+          {isMine && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={`${item.description || item.categories?.name} 삭제`}
+              className="hidden lg:flex size-8 items-center justify-center rounded-lg text-slate-300 dark:text-slate-600
+                         opacity-0 group-hover:opacity-100 focus-visible:opacity-100
+                         hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-500/10
+                         transition-opacity"
+            >
+              <span className="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          )}
         </div>
       </div>
     </div>
