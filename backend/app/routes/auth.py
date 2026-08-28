@@ -49,4 +49,10 @@ def login(request: Request, payload: schemas.LoginRequest, db: Session = Depends
 
 @router.get("/me", response_model=schemas.UserResponse)
 def get_me(current_user: models.User = Depends(get_current_user)):
-    return current_user
+    return schemas.UserResponse(
+        id=current_user.id,
+        group_id=current_user.group_id,
+        display_name=current_user.display_name,
+        # 화면이 카테고리 관리 영역을 보여줄지 가른다. 권한 판단 자체는 서버가 다시 한다.
+        is_group_admin=current_user.group is not None and current_user.group.admin_user_id == current_user.id,
+    )

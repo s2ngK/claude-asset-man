@@ -169,3 +169,30 @@ export async function restoreGroup(groupId: string): Promise<AdminGroup> {
 export async function regenerateGroupAdminCode(groupId: string): Promise<AdminGroup> {
   return adminRequest<AdminGroup>(`/api/admin/groups/${groupId}/admin-code`, { method: 'POST' });
 }
+
+/** 공통 카테고리 — `group_id` 가 없는 것. **모든 그룹이 함께 본다.** */
+export interface AdminCategory {
+  id: string;
+  group_id: string | null;
+  type: 'income' | 'expense';
+  name: string;
+  icon: string | null;
+  color: string | null;
+  is_default: boolean;
+}
+
+export async function listSystemCategories(): Promise<AdminCategory[]> {
+  return adminRequest<AdminCategory[]>('/api/admin/categories');
+}
+
+export async function createSystemCategory(data: {
+  type: 'income' | 'expense'; name: string; icon?: string;
+}): Promise<AdminCategory> {
+  // 색은 보내지 않는다 — 서버가 검증된 팔레트에서 배정한다 (docs/stats-rules.md).
+  return adminRequest<AdminCategory>('/api/admin/categories', { method: 'POST', body: JSON.stringify(data) });
+}
+
+/** 지우면 **모든 그룹의** 해당 거래가 `기타` 로 옮겨간다. 거래 자체는 남는다. */
+export async function deleteSystemCategory(id: string): Promise<void> {
+  return adminRequest<void>(`/api/admin/categories/${id}`, { method: 'DELETE' });
+}

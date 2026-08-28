@@ -56,6 +56,8 @@ class UserResponse(BaseModel):
     id: str
     group_id: str
     display_name: str
+    # 그룹 카테고리를 만들고 지울 수 있는 사람인지. 화면이 관리 영역을 보여줄지 가른다.
+    is_group_admin: bool = False
     model_config = {"from_attributes": True}
 
 
@@ -68,6 +70,13 @@ class CategoryResponse(BaseModel):
     color: str | None = None
     is_default: bool
     model_config = {"from_attributes": True}
+
+
+class CategoryCreate(BaseModel):
+    type: TransactionType
+    name: str = Field(min_length=1, max_length=20)
+    # 이모지 한두 글자. 색은 받지 않는다 — 검증된 팔레트에서 서버가 배정한다.
+    icon: str | None = Field(default=None, max_length=8)
 
 
 class TransactionCreate(BaseModel):

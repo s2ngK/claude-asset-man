@@ -9,6 +9,7 @@
 - [ ] 코드 리뷰에서 나온 결함 13건 해결 — [#5 ~ #17](https://github.com/s2ngK/claude-asset-man/issues?q=is%3Aissue+is%3Aopen+label%3A%22코드리뷰+2026-08%22)
   - 권장 순서: #6(입력 검증) → #5(그룹 소유권) → #7(삭제 타이머) → #8+#9(Docker 배포) → #12+#10(fail-fast) → #11(401 처리)
 
+- [ ] [#41](https://github.com/s2ngK/claude-asset-man/issues/41) 그룹 전용 카테고리 관리 (`feat/41-group-categories`)
 - [ ] [#42](https://github.com/s2ngK/claude-asset-man/issues/42) 데스크톱 반응형 (`feat/42-desktop-responsive`)
 
 
@@ -16,9 +17,8 @@
 
 - [x] 유출됐던 Supabase Personal Access Token 재발급/폐기 확인 (git 히스토리에선 제거 완료, 토큰 자체 회전 필요) - 별도 작업으로 프로젝트 자체 폐기
 - [x] `update-claude-md`, `change-claude` 스테일 브랜치 정리 여부 결정 (둘 다 main에 완전히 흡수된 상태) - 브랜치 정리
-- [ ] [#41](https://github.com/s2ngK/claude-asset-man/issues/41) 그룹 전용 카테고리를 화면에서 관리 — 데이터 모델은 이미 준비돼 있고 **만들고 지우는 경로와 화면**이 없다. 색은 사용자가 고르지 않고 검증된 팔레트에서 자동 배정한다
 - [ ] [#43](https://github.com/s2ngK/claude-asset-man/issues/43) 캘린더형 일별 수입·지출 소계
-- [ ] [#44](https://github.com/s2ngK/claude-asset-man/issues/44) 대출·예적금 탭 — **가장 큰 단위의 추가.** 새 도메인·테이블·집계 규칙이 한꺼번에 필요하다
+- [ ] [#44](https://github.com/s2ngK/claude-asset-man/issues/44) 대출·예적금 탭 — **요구사항 정의서를 다시 쓰기로 했다.** 무엇을 관리할지(상환 일정까지 vs 잔액만) 정해야 테이블이 나온다
 - [ ] 프론트엔드 화면 수가 늘어나면 서버 상태관리 라이브러리(react-query 등) 도입 검토
 
 ## 다음에 볼 만한 것

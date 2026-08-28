@@ -8,14 +8,18 @@ import {
   adminLogin,
   clearAdminToken,
   createGroup,
+  createSystemCategory,
   createUser,
   deactivateGroup,
+  deleteSystemCategory,
   adminScopeOf,
   listGroups,
+  listSystemCategories,
   listUsers,
   regenerateGroupAdminCode,
   regenerateInviteCode,
   restoreGroup,
+  type AdminCategory,
   type AdminGroup,
   type AdminScope,
   type AdminUser,
@@ -165,6 +169,8 @@ function Console({ scope, onSignOut }: { scope: AdminScope | null; onSignOut: ()
         </Card>
       )}
 
+      {isSuper && <SystemCategoryCard />}
+
       {groups.map(group => (
         <GroupCard
           key={group.id}
@@ -268,11 +274,14 @@ function GroupCard({
       {isSuper && (
         <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
           {group.admin_code && (
-            <SecretRow label="그룹 관리자 인증키" value={group.admin_code}>
-              <button onClick={onRotateAdminCode} className="text-[11px] font-bold text-rose-500 hover:text-rose-600">
-                재발급
-              </button>
-            </SecretRow>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-bold text-slate-400 shrink-0">그룹 관리자 인증키</span>
+              <Secret value={group.admin_code}>
+                <button onClick={onRotateAdminCode} className="w-10 text-right text-[11px] font-bold text-rose-500 hover:text-rose-600">
+                  재발급
+                </button>
+              </Secret>
+            </div>
           )}
           <div className="flex items-center justify-between">
             <p className="text-[11px] text-slate-400">그룹 ID: {group.id}</p>
@@ -308,8 +317,13 @@ function ConfirmButton({ label, confirmLabel, onConfirm }: { label: string; conf
   );
 }
 
-/** 인증키·초대 코드처럼 **어깨 너머로 읽히면 안 되는 값**을 가려서 보여준다. */
-function SecretRow({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
+/**
+ * 인증키·초대 코드처럼 **어깨 너머로 읽히면 안 되는 값**을 가려서 보여준다.
+ *
+ * 왼쪽(이름/라벨)과 오른쪽(값·동작)을 갈라 놓는다 — 한 줄에 다 몰아넣으면 이름이
+ * 잘리고 어느 버튼이 어느 줄 것인지 눈으로 못 따라간다.
+ */
+function Secret({ value, children }: { value: string; children?: React.ReactNode }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -324,16 +338,19 @@ function SecretRow({ label, value, children }: { label: string; value: string; c
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-[11px] font-bold text-slate-400 shrink-0">{label}</span>
+    <div className="ml-auto flex items-center gap-2 shrink-0">
       <code className={cn(
-        'text-xs px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 font-mono flex-1 min-w-0 truncate',
+        'text-xs px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 font-mono',
+        // 가린 상태와 드러낸 상태의 폭이 크게 달라지면 줄이 흔들린다. 최소 폭을 준다.
+        'min-w-[9.5rem] text-center',
         !revealed && 'tracking-widest text-slate-400',
       )}>
         {revealed ? value : '•'.repeat(Math.min(value.length, 16))}
       </code>
-      <button onClick={() => setRevealed(v => !v)} className={linkButtonClass}>{revealed ? '가리기' : '보기'}</button>
-      <button onClick={copy} className="text-[11px] font-bold text-emerald-500 hover:text-emerald-600">
+      <button onClick={() => setRevealed(v => !v)} className={cn(linkButtonClass, 'w-8 text-right')}>
+        {revealed ? '가리기' : '보기'}
+      </button>
+      <button onClick={copy} className="w-10 text-right text-[11px] font-bold text-emerald-500 hover:text-emerald-600">
         {copied ? '복사됨' : '복사'}
       </button>
       {children}
@@ -345,20 +362,109 @@ function MemberRow({
   member, isGroupAdmin, onRegenerate,
 }: { member: AdminUser; isGroupAdmin: boolean; onRegenerate: (id: string) => void }) {
   return (
-    <div className="flex items-center gap-2 py-2.5">
-      <span className="text-sm font-bold w-24 shrink-0 truncate">
-        {member.display_name}
+    <div className="flex items-center gap-3 py-2.5">
+      <span className="flex items-center gap-1.5 min-w-0">
+        <span className="text-sm font-bold truncate">{member.display_name}</span>
         {isGroupAdmin && (
-          <span className="ml-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 align-middle">
+          <span className="shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400">
             관리자
           </span>
         )}
       </span>
-      <SecretRow label="초대 코드" value={member.invite_code}>
-        <button onClick={() => onRegenerate(member.id)} className="text-[11px] font-bold text-rose-500 hover:text-rose-600">
+      <Secret value={member.invite_code}>
+        <button onClick={() => onRegenerate(member.id)} className="w-10 text-right text-[11px] font-bold text-rose-500 hover:text-rose-600">
           재발급
         </button>
-      </SecretRow>
+      </Secret>
     </div>
+  );
+}
+
+/**
+ * 공통 카테고리 — `group_id` 가 없는 것. **모든 그룹이 함께 본다.**
+ * 여기서 하나를 지우면 그 카테고리를 쓰던 **모든 그룹**의 거래가 `기타` 로 옮겨간다.
+ */
+function SystemCategoryCard() {
+  const [categories, setCategories] = useState<AdminCategory[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [name, setName] = useState('');
+  const [icon, setIcon] = useState('');
+  const [type, setType] = useState<'income' | 'expense'>('expense');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await listSystemCategories();
+        if (!cancelled) { setCategories(list); setError(null); }
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err, '공통 카테고리를 불러오지 못했습니다.'));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [reloadKey]);
+
+  const run = async (action: () => Promise<unknown>) => {
+    try {
+      await action();
+      setError(null);
+      setReloadKey(key => key + 1);
+    } catch (err) {
+      setError(getErrorMessage(err, '요청에 실패했습니다.'));
+    }
+  };
+
+  return (
+    <Card title={`공통 카테고리 ${categories.length}개`}>
+      <p className="text-[11px] text-slate-400">
+        모든 그룹이 함께 씁니다. 지우면 <strong>모든 그룹의</strong> 해당 내역이 <code>기타</code> 로 옮겨집니다
+        (내역 자체는 남습니다).
+      </p>
+      {error && <p className="text-xs font-bold text-rose-500">{error}</p>}
+
+      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+        {categories.map(cat => (
+          <div key={cat.id} className="flex items-center gap-2 py-2">
+            <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: cat.color ?? '#94a3b8' }} />
+            <span className="text-sm">{cat.icon} {cat.name}</span>
+            <span className="text-[10px] text-slate-400">{cat.type === 'income' ? '수입' : '지출'}</span>
+            <span className="ml-auto shrink-0">
+              {cat.name === '기타'
+                ? <span className="text-[11px] text-slate-300 dark:text-slate-600">옮겨 둘 자리</span>
+                : <ConfirmButton label="삭제" confirmLabel="모든 그룹에서 기타로 옮깁니다 · 한 번 더"
+                    onConfirm={() => run(() => deleteSystemCategory(cat.id))} />}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!name.trim()) return;
+          run(() => createSystemCategory({ type, name: name.trim(), icon: icon.trim() || undefined }));
+          setName(''); setIcon('');
+        }}
+        className="flex flex-wrap gap-2 border-t border-slate-100 dark:border-slate-800 pt-3"
+      >
+        <select value={type} onChange={(e) => setType(e.target.value as 'income' | 'expense')}
+          aria-label="공통 카테고리 종류"
+          className="h-10 rounded-xl bg-slate-50 dark:bg-slate-800 px-3 text-sm outline-none">
+          <option value="expense">지출</option>
+          <option value="income">수입</option>
+        </select>
+        <input value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="📺" maxLength={4}
+          aria-label="공통 카테고리 아이콘"
+          className="h-10 w-16 shrink-0 rounded-xl bg-slate-50 dark:bg-slate-800 px-3 text-sm text-center outline-none" />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="카테고리 이름" maxLength={20}
+          aria-label="공통 카테고리 이름" className={inputClass} />
+        <button type="submit" disabled={!name.trim()} className={buttonClass}>추가</button>
+      </form>
+
+      <p className="text-[11px] text-slate-400">
+        색은 자동으로 배정됩니다 — 차트에서 읽히도록 검증된 값만 씁니다.
+      </p>
+    </Card>
   );
 }

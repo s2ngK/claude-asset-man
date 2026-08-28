@@ -376,3 +376,98 @@ def test_group_admin_sees_who_the_admin_is(client, user, group_admin_headers):
     body = client.get("/api/admin/groups", headers=group_admin_headers).json()
     assert body[0]["admin_user_name"] == user.display_name
     assert body[0]["admin_code"] is None  # 인증키는 여전히 안 보인다
+
+
+# ── 공통 카테고리는 전체 관리자만 만진다 ────────────────────────────────────
+
+
+def _sys_cat(client, name="구독료", type_="expense", headers=None):
+    return client.post(
+        "/api/admin/categories",
+        json={"type": type_, "name": name, "icon": "📺"},
+        headers=headers or {"X-Admin-Key": ADMIN_KEY},
+    )
+
+
+def test_super_admin_creates_a_system_category(client):
+    res = _sys_cat(client)
+    assert res.status_code == 201
+    body = res.json()
+    assert body["group_id"] is None  # 공통이다
+    assert body["is_default"] is True
+
+
+def test_system_category_color_comes_from_the_palette(client):
+    from app.palette import CATEGORICAL_COLORS
+
+    assert _sys_cat(client).json()["color"] in CATEGORICAL_COLORS
+
+
+def test_system_category_is_visible_to_every_group(client, auth_headers, category):
+    created = _sys_cat(client).json()
+    listed = client.get("/api/categories", headers=auth_headers).json()
+    assert created["id"] in [c["id"] for c in listed]
+
+
+def test_group_admin_cannot_touch_system_categories(client, group_admin_headers):
+    assert client.get("/api/admin/categories", headers=group_admin_headers).status_code == 403
+    assert _sys_cat(client, headers=group_admin_headers).status_code == 403
+
+
+def test_system_category_duplicate_name_is_rejected(client, category):
+    """`category` 픽스처가 공통 `식비` 다."""
+    assert _sys_cat(client, name=category.name, type_=category.type).status_code == 409
+
+
+def test_deleting_a_system_category_moves_every_groups_transactions(client, db_session, user, group_mate, category):
+    """공통 카테고리는 모든 그룹이 쓴다 — 지우면 **전부** 옮겨가야 한다."""
+    from app import models
+
+    db_session.add(models.Category(id="etc-expense", group_id=None, type="expense", name="기타", is_default=True))
+    db_session.commit()
+    shared = _sys_cat(client).json()
+
+    for tx_id, owner in (("tx-mine", user), ("tx-mate", group_mate)):
+        db_session.add(
+            models.Transaction(
+                id=tx_id,
+                group_id=owner.group_id,
+                user_id=owner.id,
+                category_id=shared["id"],
+                type="expense",
+                amount=1000,
+                description="넷플릭스",
+                date="2026-08-03",
+            )
+        )
+    db_session.commit()
+
+    assert client.delete(f"/api/admin/categories/{shared['id']}", headers={"X-Admin-Key": ADMIN_KEY}).status_code == 204
+
+    for tx_id in ("tx-mine", "tx-mate"):
+        moved = db_session.query(models.Transaction).filter(models.Transaction.id == tx_id).first()
+        assert moved is not None
+        assert moved.category_id == "etc-expense"
+        assert moved.description == "넷플릭스"
+
+
+def test_cannot_delete_the_fallback_category(client, db_session):
+    """`기타` 를 지우면 그 뒤로 어떤 카테고리도 지울 수 없게 된다."""
+    from app import models
+
+    db_session.add(models.Category(id="etc-expense", group_id=None, type="expense", name="기타", is_default=True))
+    db_session.commit()
+
+    res = client.delete("/api/admin/categories/etc-expense", headers={"X-Admin-Key": ADMIN_KEY})
+    assert res.status_code == 409
+    assert db_session.query(models.Category).filter(models.Category.id == "etc-expense").first() is not None
+
+
+def test_cannot_delete_a_group_category_from_the_admin_route(client, own_group_category):
+    """그룹 전용 카테고리는 그 그룹 관리자 몫이다 — 여기서는 안 보인다."""
+    res = client.delete(f"/api/admin/categories/{own_group_category.id}", headers={"X-Admin-Key": ADMIN_KEY})
+    assert res.status_code == 404
+
+
+def test_group_admin_cannot_delete_a_system_category(client, category, group_admin_headers):
+    assert client.delete(f"/api/admin/categories/{category.id}", headers=group_admin_headers).status_code == 403
