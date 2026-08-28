@@ -48,10 +48,37 @@ def client(db_session):
 
 @pytest.fixture()
 def group(db_session):
-    g = models.Group(id="test-group", name="테스트 그룹")
+    g = models.Group(id="test-group", name="테스트 그룹", admin_code="GROUPADMINCODE1")
     db_session.add(g)
     db_session.commit()
     return g
+
+
+@pytest.fixture()
+def other_group(db_session):
+    """다른 그룹 — 그룹 관리자가 넘어가면 안 되는 경계."""
+    g = models.Group(id="other-admin-group", name="다른 그룹", admin_code="GROUPADMINCODE2")
+    db_session.add(g)
+    db_session.commit()
+    return g
+
+
+@pytest.fixture()
+def other_group_user(db_session, other_group):
+    u = models.User(
+        id="other-admin-user", group_id=other_group.id, display_name="남의 그룹 사람", invite_code="OTHERCODE1"
+    )
+    db_session.add(u)
+    db_session.commit()
+    return u
+
+
+@pytest.fixture()
+def group_admin_headers(client, group):
+    """그룹 관리자 토큰. 인증키를 로그인에 한 번 써서 토큰으로 바꾼다."""
+    res = client.post("/api/admin/login", json={"admin_key": group.admin_code})
+    assert res.status_code == 200, res.json()
+    return {"Authorization": f"Bearer {res.json()['access_token']}"}
 
 
 @pytest.fixture()

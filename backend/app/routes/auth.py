@@ -33,6 +33,10 @@ def login(request: Request, payload: schemas.LoginRequest, db: Session = Depends
     user = db.query(models.User).filter(models.User.invite_code == payload.invite_code).first()
     if not user:
         raise HTTPException(status_code=401, detail="유효하지 않은 초대 코드입니다.")
+    # 비활성화된 그룹의 구성원은 들어올 수 없다. 코드는 비활성화 시점에 이미 새로 발급돼
+    # 옛 코드로는 여기까지 오지도 못하지만, 새 코드를 아는 사람도 막아야 한다.
+    if user.group is None or not user.group.is_active:
+        raise HTTPException(status_code=403, detail="비활성화된 그룹입니다.")
     token, expires_at = create_access_token(user.id, user.group_id)
     return schemas.TokenResponse(
         access_token=token,

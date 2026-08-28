@@ -20,7 +20,17 @@ class Group(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=gen_uuid)
     name: Mapped[str] = mapped_column(String, nullable=False)
+    # 그룹 관리자 인증키. 초대 코드와 같은 성격이다 — 이 값 하나가 곧 그 그룹의 관리 권한이다.
+    # 전체 관리자가 발급해 따로 전달한다.
+    admin_code: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
+    # 비활성 시각. NULL 이면 살아 있는 그룹이다.
+    # **행을 지우지 않는다** — 기록을 남겨두고 복구할 수 있어야 한다.
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    @property
+    def is_active(self) -> bool:
+        return self.deactivated_at is None
 
     users: Mapped[list[User]] = relationship("User", back_populates="group")
     transactions: Mapped[list[Transaction]] = relationship("Transaction", back_populates="group")

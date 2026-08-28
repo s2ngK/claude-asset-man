@@ -24,6 +24,17 @@ class AdminTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_at: datetime
+    # 전체 관리자면 None. 그룹 관리자면 자기 그룹 — 화면이 무엇을 보여줄지 이걸로 가른다.
+    group_id: str | None = None
+    group_name: str | None = None
+
+
+class GroupResponse(BaseModel):
+    id: str
+    name: str
+    is_active: bool
+    # 그룹 관리자 인증키는 **전체 관리자에게만** 내려간다. 그 외에는 None.
+    admin_code: str | None = None
 
 
 class TokenResponse(BaseModel):

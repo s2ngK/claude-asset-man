@@ -15,6 +15,8 @@ erDiagram
     groups {
         string id PK
         string name
+        string admin_code UK "그룹 관리자 인증키"
+        datetime deactivated_at "NULL이면 활성"
     }
     users {
         string id PK
@@ -84,3 +86,15 @@ erDiagram
 - `updated_at` — 수정 이력을 추적하지 않는다
 - 소프트 삭제 — DELETE는 실제 삭제다
 - `image_url` — `src/types/index.ts`에 필드가 남아 있지만 Supabase 시절 잔재고 DB에도 API에도 없다
+
+# 그룹은 지우지 않는다
+
+`groups.deactivated_at` 이 NULL 이 아니면 **비활성 그룹**이다. 행도, 거래도, 카테고리도
+그대로 둔다 — 복구할 수 있어야 하기 때문이다.
+
+비활성화하면 그 그룹의 **인증키가 전부 새로 발급된다** (구성원 `invite_code` + 그룹
+`admin_code`). 복구해도 옛 코드는 살아나지 않는다 → [관리자 화면](admin-console.md)
+
+`admin_code` 는 유니크 인덱스(`ix_groups_admin_code`)로 강제한다. 이 값 하나가 곧 그
+그룹의 관리 권한이라 겹치면 안 된다. SQLite 유니크 인덱스는 NULL 을 여럿 허용하므로
+값이 없는 그룹이 생길 수 있다 — 그룹 생성 시 항상 함께 발급해 그 상태를 만들지 않는다.
