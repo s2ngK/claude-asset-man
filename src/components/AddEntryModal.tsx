@@ -90,7 +90,11 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-white dark:bg-slate-950 flex flex-col max-w-md mx-auto h-full animate-in slide-in-from-bottom duration-300">
+    /* 좁은 화면에서는 아래에서 올라오는 전체 화면, 넓은 화면에서는 가운데 뜨는 다이얼로그.
+       넓은 화면에서 전체를 덮으면 뒤 목록이 사라져 방금 무엇을 보고 있었는지 잃는다. */
+    <div className="fixed inset-0 z-50 flex sm:items-center sm:justify-center sm:bg-slate-900/40 sm:backdrop-blur-sm">
+    <div className="flex flex-col w-full h-full bg-white dark:bg-slate-950 animate-in slide-in-from-bottom duration-300
+                    sm:h-auto sm:max-h-[92vh] sm:w-[26rem] sm:rounded-3xl sm:shadow-2xl sm:overflow-hidden sm:zoom-in-95">
       <div className="flex justify-center pt-3 pb-1">
         <div className="w-12 h-1 bg-slate-200 dark:bg-slate-700 rounded-full" />
       </div>
@@ -166,6 +170,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
           <Button variant="ghost" onClick={onClose} className="w-full text-slate-400">닫기</Button>
         </div>
       </div>
+    </div>
     </div>
   );
 };
