@@ -51,6 +51,7 @@ export default function MainView() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all'); // category_id 또는 'all'
+  const [memberFilter, setMemberFilter] = useState<string>('all');     // user_id 또는 'all'
   // 이 달 전체 합계는 **서버가 낸 값**이다. 목록을 reduce 하면 지금은 같은 값이 나오지만,
   // 페이지네이션을 넣는 순간 화면에 있는 것만 더하게 되어 조용히 틀려진다 (#14).
   const [monthSummary, setMonthSummary] = useState<MonthlySummary>({ income: 0, expense: 0, balance: 0 });
@@ -152,7 +153,22 @@ export default function MainView() {
     await Promise.all([fetchTransactions(), fetchSummary()]);
   };
 
-  const filterActive = typeFilter !== 'all' || categoryFilter !== 'all';
+  const filterActive = typeFilter !== 'all' || categoryFilter !== 'all' || memberFilter !== 'all';
+
+  // 구성원 목록은 **이 달 거래에서 뽑는다.** 따로 받아올 필요가 없고, 이번 달에 아무것도
+  // 안 쓴 사람은 골라봐야 0건이라 목록에 없는 편이 낫다.
+  const memberOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    transactions.forEach(t => {
+      if (!seen.has(t.user_id)) seen.set(t.user_id, t.user_display_name ?? '알 수 없음');
+    });
+    return [...seen].map(([id, name]) => ({
+      id,
+      // 자기 것은 목록에서도 '나' 로 부른다. 행 표시와 같은 말을 써야 헷갈리지 않는다.
+      label: id === user?.id ? '나' : name,
+      isMine: id === user?.id,
+    })).sort((a, b) => Number(b.isMine) - Number(a.isMine) || a.label.localeCompare(b.label));
+  }, [transactions, user?.id]);
 
   // 카테고리 드롭다운은 고른 종류에 맞는 것만 보여준다 (지출을 고르고 '급여'를 남겨두지 않는다).
   const categoryOptions = useMemo(
@@ -172,14 +188,15 @@ export default function MainView() {
   const visibleTransactions = useMemo(() => {
     const filtered = transactions.filter(t =>
       (typeFilter === 'all' || t.type === typeFilter) &&
-      (categoryFilter === 'all' || t.category_id === categoryFilter)
+      (categoryFilter === 'all' || t.category_id === categoryFilter) &&
+      (memberFilter === 'all' || t.user_id === memberFilter)
     );
     // 같은 날짜 안에서는 **입력 순서**로 가른다. 날짜만 보면 오늘 넣은 것들의 순서가
     // 서버가 준 순서에 맡겨져, 방금 적은 항목이 어디 있는지 알 수 없다.
     const key = (t: Transaction) => `${t.date} ${t.created_at ?? ''}`;
     return [...filtered].sort((a, b) =>
       sortOrder === 'newest' ? key(b).localeCompare(key(a)) : key(a).localeCompare(key(b)));
-  }, [transactions, typeFilter, categoryFilter, sortOrder]);
+  }, [transactions, typeFilter, categoryFilter, memberFilter, sortOrder]);
 
   const groupedTransactions = useMemo(() => {
     const groups: { [date: string]: Transaction[] } = {};
@@ -273,6 +290,16 @@ export default function MainView() {
           {categoryOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
 
+        {/* 혼자 쓰는 달에는 고를 것이 없다. 그때는 아예 내보내지 않는다. */}
+        {memberOptions.length > 1 && (
+          <select value={memberFilter} onChange={(e) => setMemberFilter(e.target.value)}
+            aria-label="구성원 필터"
+            className="h-8 rounded-xl bg-slate-100 dark:bg-slate-900 px-3 text-xs font-bold text-slate-600 dark:text-slate-300 border-none outline-none">
+            <option value="all">전체 구성원</option>
+            {memberOptions.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        )}
+
         <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
           className="ml-auto lg:ml-0 flex items-center gap-1 h-8 px-3 rounded-xl bg-slate-100 dark:bg-slate-900 text-xs font-bold text-slate-600 dark:text-slate-300">
           <span className="material-symbols-outlined text-[16px]">swap_vert</span>
@@ -302,7 +329,7 @@ export default function MainView() {
             ) : (
               <>
                 <p>조건에 맞는 내역이 없습니다.</p>
-                <button onClick={() => { setTypeFilter('all'); setCategoryFilter('all'); }}
+                <button onClick={() => { setTypeFilter('all'); setCategoryFilter('all'); setMemberFilter('all'); }}
                   className="mt-3 text-xs font-bold text-emerald-500">필터 초기화</button>
               </>
             )}
