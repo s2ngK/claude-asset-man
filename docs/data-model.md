@@ -16,6 +16,7 @@ erDiagram
         string id PK
         string name
         string admin_code UK "그룹 관리자 인증키"
+        string admin_user_id "그룹 관리자 = 최초 초대 사용자"
         datetime deactivated_at "NULL이면 활성"
     }
     users {
@@ -94,6 +95,10 @@ erDiagram
 
 비활성화하면 그 그룹의 **인증키가 전부 새로 발급된다** (구성원 `invite_code` + 그룹
 `admin_code`). 복구해도 옛 코드는 살아나지 않는다 → [관리자 화면](admin-console.md)
+
+`admin_user_id` 는 `users.id` 를 가리키지만 **ForeignKey 를 걸지 않는다.** `users.group_id` 가
+이미 `groups` 를 가리켜서, 제약을 걸면 두 테이블이 순환하고 `create_all` 이 거기서 걸린다.
+채우는 곳이 한 군데(`create_user`)뿐이라 그쪽에서 지킨다.
 
 `admin_code` 는 유니크 인덱스(`ix_groups_admin_code`)로 강제한다. 이 값 하나가 곧 그
 그룹의 관리 권한이라 겹치면 안 된다. SQLite 유니크 인덱스는 NULL 을 여럿 허용하므로

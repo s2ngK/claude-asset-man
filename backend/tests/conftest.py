@@ -83,8 +83,10 @@ def group_admin_headers(client, group):
 
 @pytest.fixture()
 def user(db_session, group):
+    """그룹의 첫 구성원. 실제 경로(create_user)와 마찬가지로 **그룹 관리자**가 된다."""
     u = models.User(id="test-user", group_id=group.id, display_name="홍길동", invite_code="TESTCODE1")
     db_session.add(u)
+    group.admin_user_id = u.id
     db_session.commit()
     return u
 

@@ -26,6 +26,12 @@ class Group(Base):
     # 비활성 시각. NULL 이면 살아 있는 그룹이다.
     # **행을 지우지 않는다** — 기록을 남겨두고 복구할 수 있어야 한다.
     deactivated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # 이 그룹의 관리자. **그룹당 한 명**이고 최초 초대 사용자로 정해진다.
+    #
+    # users.id 를 가리키지만 ForeignKey 를 걸지 않는다 — users.group_id 가 이미 groups 를
+    # 가리키고 있어 제약을 걸면 두 테이블이 순환한다. SQLite 는 외래키를 강제하지도 않고,
+    # create_all 이 순환에서 걸린다. 참조 무결성은 이 값을 채우는 한 곳(create_user)에서 지킨다.
+    admin_user_id: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     @property
