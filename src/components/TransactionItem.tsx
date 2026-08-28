@@ -155,8 +155,12 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, isMine, onDelet
           }
         }}
         className={cn(
-          "relative bg-white dark:bg-slate-900 flex items-center gap-4 px-4 min-h-[72px] py-2 justify-between",
-          isMine && "cursor-pointer active:bg-slate-50 dark:active:bg-slate-800",
+          "relative flex items-center gap-4 px-4 min-h-[72px] py-2 justify-between",
+          // 내 내역은 아주 옅게 깐다. **불투명한 색이어야 한다** — 반투명이면 스와이프로
+          // 밀렸을 때 뒤에 깔린 빨간 삭제 배경이 비쳐 보인다.
+          isMine
+            ? "bg-[#f4fbf7] dark:bg-[#0f1b18] cursor-pointer active:bg-emerald-50 dark:active:bg-emerald-950/40"
+            : "bg-white dark:bg-slate-900",
           // 끄는 동안엔 전환을 끈다. 안 그러면 200ms 씩 뒤따라와 손에 안 붙는다.
           !dragging && "transition-transform duration-200 ease-out"
         )}
@@ -167,6 +171,12 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, isMine, onDelet
         onPointerUp={isMine ? onPointerUp : undefined}
         onPointerCancel={isMine ? onPointerCancel : undefined}
       >
+        {/* 왼쪽 강조 막대. absolute 라 **어느 칸의 폭도 밀지 않는다** — 흐름 안에 두면
+            내 내역만 안쪽으로 밀려 금액이 줄마다 어긋난다. */}
+        {isMine && (
+          <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-emerald-400 dark:bg-emerald-500" />
+        )}
+
         <div className="flex items-center gap-4">
           <div 
             className="flex items-center justify-center rounded-xl shrink-0 size-11 transition-transform duration-300 group-hover:scale-105"
@@ -178,8 +188,17 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, isMine, onDelet
             <p className="text-slate-900 dark:text-white text-[15px] font-semibold leading-tight line-clamp-1">
               {item.description || item.categories?.name}
             </p>
-            <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-normal mt-0.5">
-              {item.date} • {isMine ? '나' : (item.user_display_name || '알 수 없음')}
+            {/* 작성자는 **왼쪽 정렬 영역**에만 둔다. 오른쪽(금액) 칸을 건드리면 줄마다
+                끝이 어긋난다. 색은 보조 수단이고 글자가 항상 함께 나온다. */}
+            <p className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-normal mt-0.5">
+              <span>{item.date}</span>
+              {isMine ? (
+                <span className="rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-1.5 py-px text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                  나
+                </span>
+              ) : (
+                <span>• {item.user_display_name || '알 수 없음'}</span>
+              )}
             </p>
           </div>
         </div>
