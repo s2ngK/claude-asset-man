@@ -35,6 +35,9 @@ class GroupResponse(BaseModel):
     is_active: bool
     # 그룹 관리자 인증키는 **전체 관리자에게만** 내려간다. 그 외에는 None.
     admin_code: str | None = None
+    # 이 그룹의 관리자(최초 초대 사용자). 구성원이 아직 없으면 None.
+    admin_user_id: str | None = None
+    admin_user_name: str | None = None
 
 
 class TokenResponse(BaseModel):

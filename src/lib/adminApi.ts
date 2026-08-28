@@ -111,6 +111,9 @@ export interface AdminGroup {
   is_active: boolean;
   /** 그룹 관리자 인증키. **전체 관리자에게만** 내려온다. */
   admin_code: string | null;
+  /** 이 그룹의 관리자 = 최초 초대 사용자. 구성원이 아직 없으면 null. */
+  admin_user_id: string | null;
+  admin_user_name: string | null;
 }
 
 export interface AdminUser {

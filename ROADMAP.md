@@ -9,13 +9,17 @@
 - [ ] 코드 리뷰에서 나온 결함 13건 해결 — [#5 ~ #17](https://github.com/s2ngK/claude-asset-man/issues?q=is%3Aissue+is%3Aopen+label%3A%22코드리뷰+2026-08%22)
   - 권장 순서: #6(입력 검증) → #5(그룹 소유권) → #7(삭제 타이머) → #8+#9(Docker 배포) → #12+#10(fail-fast) → #11(401 처리)
 
-- [ ] 그룹 비활성화(복구 가능)와 그룹 관리자 (`feat/group-deactivation-and-group-admins`)
+- [ ] 그룹 관리자를 최초 초대 사용자 한 명으로 고정 (`feat/group-admin-is-first-member`)
 
 
 ## 다음 작업 (백로그)
 
 - [x] 유출됐던 Supabase Personal Access Token 재발급/폐기 확인 (git 히스토리에선 제거 완료, 토큰 자체 회전 필요) - 별도 작업으로 프로젝트 자체 폐기
 - [x] `update-claude-md`, `change-claude` 스테일 브랜치 정리 여부 결정 (둘 다 main에 완전히 흡수된 상태) - 브랜치 정리
+- [ ] [#41](https://github.com/s2ngK/claude-asset-man/issues/41) 그룹 전용 카테고리를 화면에서 관리 — 데이터 모델은 이미 준비돼 있고 **만들고 지우는 경로와 화면**이 없다. 색은 사용자가 고르지 않고 검증된 팔레트에서 자동 배정한다
+- [ ] [#42](https://github.com/s2ngK/claude-asset-man/issues/42) 데스크톱 반응형 — 지금은 모든 화면이 `max-w-md` 한 칸이다
+- [ ] [#43](https://github.com/s2ngK/claude-asset-man/issues/43) 캘린더형 일별 수입·지출 소계
+- [ ] [#44](https://github.com/s2ngK/claude-asset-man/issues/44) 대출·예적금 탭 — **가장 큰 단위의 추가.** 새 도메인·테이블·집계 규칙이 한꺼번에 필요하다
 - [ ] 프론트엔드 화면 수가 늘어나면 서버 상태관리 라이브러리(react-query 등) 도입 검토
 
 ## 다음에 볼 만한 것
@@ -32,6 +36,7 @@
 
 ## 완료
 
+- [x] 그룹 비활성화(복구 가능)와 그룹 관리자 (PR #40)
 - [x] #33 — 관리자 화면(`/admin`): 그룹·구성원·초대 코드 관리 (PR #39)
 - [x] #37 — 카테고리 색을 접근성 기준 통과 값으로 교체 (PR #38)
 - [x] #13 + #14 + #15 + #16 + #17 — 남은 품질 이슈 일괄 정리 (PR #36). **코드리뷰 13건 전부 종료**

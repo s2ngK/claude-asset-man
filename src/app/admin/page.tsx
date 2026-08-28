@@ -230,8 +230,22 @@ function GroupCard({
         </p>
       )}
 
+      <p className="text-[11px] text-slate-500">
+        그룹 관리자{' '}
+        {group.admin_user_name
+          ? <strong className="text-slate-700 dark:text-slate-200">{group.admin_user_name}</strong>
+          : <span className="text-slate-400">아직 없음 — 첫 구성원이 관리자가 됩니다</span>}
+      </p>
+
       <div className="divide-y divide-slate-100 dark:divide-slate-800">
-        {members.map(member => <MemberRow key={member.id} member={member} onRegenerate={onRegenerate} />)}
+        {members.map(member => (
+          <MemberRow
+            key={member.id}
+            member={member}
+            isGroupAdmin={member.id === group.admin_user_id}
+            onRegenerate={onRegenerate}
+          />
+        ))}
         {members.length === 0 && <p className="text-sm text-slate-400 pb-3">아직 구성원이 없습니다.</p>}
       </div>
 
@@ -327,10 +341,19 @@ function SecretRow({ label, value, children }: { label: string; value: string; c
   );
 }
 
-function MemberRow({ member, onRegenerate }: { member: AdminUser; onRegenerate: (id: string) => void }) {
+function MemberRow({
+  member, isGroupAdmin, onRegenerate,
+}: { member: AdminUser; isGroupAdmin: boolean; onRegenerate: (id: string) => void }) {
   return (
     <div className="flex items-center gap-2 py-2.5">
-      <span className="text-sm font-bold w-24 shrink-0 truncate">{member.display_name}</span>
+      <span className="text-sm font-bold w-24 shrink-0 truncate">
+        {member.display_name}
+        {isGroupAdmin && (
+          <span className="ml-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 align-middle">
+            관리자
+          </span>
+        )}
+      </span>
       <SecretRow label="초대 코드" value={member.invite_code}>
         <button onClick={() => onRegenerate(member.id)} className="text-[11px] font-bold text-rose-500 hover:text-rose-600">
           재발급

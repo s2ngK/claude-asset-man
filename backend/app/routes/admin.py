@@ -47,7 +47,10 @@ def _group_or_404(db: Session, group_id: str) -> models.Group:
     return group
 
 
-def _serialize_group(group: models.Group, viewer: AdminIdentity) -> schemas.GroupResponse:
+def _serialize_group(group: models.Group, viewer: AdminIdentity, db: Session) -> schemas.GroupResponse:
+    admin_user = (
+        db.query(models.User).filter(models.User.id == group.admin_user_id).first() if group.admin_user_id else None
+    )
     return schemas.GroupResponse(
         id=group.id,
         name=group.name,
@@ -55,6 +58,8 @@ def _serialize_group(group: models.Group, viewer: AdminIdentity) -> schemas.Grou
         # 그룹 관리자 인증키는 **전체 관리자에게만** 보인다. 그룹 관리자가 자기 키를
         # 다시 읽을 수 있으면, 그 화면을 한 번 본 사람이 영구 접근권을 갖는다.
         admin_code=group.admin_code if viewer.is_super else None,
+        admin_user_id=group.admin_user_id,
+        admin_user_name=admin_user.display_name if admin_user else None,
     )
 
 
@@ -106,7 +111,7 @@ def create_group(
     db.add(group)
     db.commit()
     db.refresh(group)
-    return _serialize_group(group, admin)
+    return _serialize_group(group, admin, db)
 
 
 @router.get("/groups", response_model=list[schemas.GroupResponse])
@@ -121,7 +126,7 @@ def list_groups(
     query = db.query(models.Group)
     if not admin.is_super:
         query = query.filter(models.Group.id == admin.group_id)
-    return [_serialize_group(g, admin) for g in query.all()]
+    return [_serialize_group(g, admin, db) for g in query.all()]
 
 
 @router.post("/groups/{group_id}/deactivate", response_model=schemas.GroupResponse)
@@ -151,7 +156,7 @@ def deactivate_group(
             user.invite_code = _new_code(8)
         db.commit()
         db.refresh(group)
-    return _serialize_group(group, admin)
+    return _serialize_group(group, admin, db)
 
 
 @router.post("/groups/{group_id}/restore", response_model=schemas.GroupResponse)
@@ -175,7 +180,7 @@ def restore_group(
     group.deactivated_at = None
     db.commit()
     db.refresh(group)
-    return _serialize_group(group, admin)
+    return _serialize_group(group, admin, db)
 
 
 @router.post("/groups/{group_id}/admin-code", response_model=schemas.GroupResponse)
@@ -195,7 +200,7 @@ def regenerate_group_admin_code(
     group.admin_code = _new_code()
     db.commit()
     db.refresh(group)
-    return _serialize_group(group, admin)
+    return _serialize_group(group, admin, db)
 
 
 # ── 구성원 ───────────────────────────────────────────────────────────────────
@@ -226,6 +231,10 @@ def create_user(
         id=str(uuid.uuid4()), group_id=payload.group_id, display_name=payload.display_name, invite_code=code
     )
     db.add(user)
+    # 그룹 관리자는 **한 명**이고 최초 초대 사용자로 정해진다. 뒤에 들어온 구성원이
+    # 조용히 관리자가 되는 일이 없도록 비어 있을 때만 채운다.
+    if group.admin_user_id is None:
+        group.admin_user_id = user.id
     db.commit()
     db.refresh(user)
     return {"id": user.id, "group_id": user.group_id, "display_name": user.display_name, "invite_code": code}

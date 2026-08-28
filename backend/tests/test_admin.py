@@ -317,3 +317,62 @@ def test_existing_group_admin_token_dies_with_the_group(client, group, group_adm
 
 def test_group_admin_token_is_not_a_user_token(client, group_admin_headers):
     assert client.get("/api/transactions", headers=group_admin_headers).status_code == 401
+
+
+# ── 그룹 관리자는 최초 초대 사용자로 고정된다 ────────────────────────────────
+
+
+def _groups(client):
+    return client.get("/api/admin/groups", headers={"X-Admin-Key": ADMIN_KEY}).json()
+
+
+def _add_member(client, group_id, name):
+    return client.post(
+        "/api/admin/users",
+        json={"group_id": group_id, "display_name": name},
+        headers={"X-Admin-Key": ADMIN_KEY},
+    ).json()
+
+
+def test_new_group_has_no_admin_until_someone_joins(client):
+    created = client.post("/api/admin/groups", json={"name": "빈 그룹"}, headers={"X-Admin-Key": ADMIN_KEY}).json()
+    assert created["admin_user_id"] is None
+    assert created["admin_user_name"] is None
+
+
+def test_first_member_becomes_the_group_admin(client):
+    group = client.post("/api/admin/groups", json={"name": "새 그룹"}, headers={"X-Admin-Key": ADMIN_KEY}).json()
+    first = _add_member(client, group["id"], "첫 사람")
+
+    after = next(g for g in _groups(client) if g["id"] == group["id"])
+    assert after["admin_user_id"] == first["id"]
+    assert after["admin_user_name"] == "첫 사람"
+
+
+def test_later_members_do_not_take_over(client):
+    """뒤에 들어온 사람이 조용히 관리자가 되면 안 된다."""
+    group = client.post("/api/admin/groups", json={"name": "새 그룹"}, headers={"X-Admin-Key": ADMIN_KEY}).json()
+    first = _add_member(client, group["id"], "첫 사람")
+    _add_member(client, group["id"], "둘째")
+    _add_member(client, group["id"], "셋째")
+
+    after = next(g for g in _groups(client) if g["id"] == group["id"])
+    assert after["admin_user_id"] == first["id"]
+
+
+def test_deactivation_and_restore_keep_the_admin(client):
+    group = client.post("/api/admin/groups", json={"name": "새 그룹"}, headers={"X-Admin-Key": ADMIN_KEY}).json()
+    first = _add_member(client, group["id"], "첫 사람")
+
+    client.post(f"/api/admin/groups/{group['id']}/deactivate", headers={"X-Admin-Key": ADMIN_KEY})
+    client.post(f"/api/admin/groups/{group['id']}/restore", headers={"X-Admin-Key": ADMIN_KEY})
+
+    after = next(g for g in _groups(client) if g["id"] == group["id"])
+    assert after["admin_user_id"] == first["id"]
+
+
+def test_group_admin_sees_who_the_admin_is(client, user, group_admin_headers):
+    """자기 그룹의 관리자가 누구인지는 그룹 관리자도 볼 수 있다 — 인증키와 달리 비밀이 아니다."""
+    body = client.get("/api/admin/groups", headers=group_admin_headers).json()
+    assert body[0]["admin_user_name"] == user.display_name
+    assert body[0]["admin_code"] is None  # 인증키는 여전히 안 보인다
