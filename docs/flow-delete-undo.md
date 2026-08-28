@@ -104,7 +104,7 @@ sequenceDiagram
 
 > [!NOTE]
 > 마우스에는 **아직 발견 가능성(discoverability) 문제가 남아 있다.** 끌 수 있다는 걸
-> 알려주는 표시가 없다. 호버 시 삭제 버튼을 살짝 드러내는 식의 보완은 하지 않았다.
+> 알려주는 표시가 없다 → [반응형 레이아웃](responsive-layout.md) 의 "아직 안 한 것"
 
 > [!NOTE]
 > 행을 그냥 클릭하면 아무 일도 안 일어난다. `MainView` 가 `onEdit` 을 넘기지 않아
