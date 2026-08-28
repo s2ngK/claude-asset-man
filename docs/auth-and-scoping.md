@@ -176,6 +176,21 @@ def visible_categories(db: Session, group_id: str) -> Query[models.Category]:
 관리자 토큰 수명은 `ADMIN_TOKEN_EXPIRE_MINUTES`(기본 60분)로, 사용자 토큰(30일)보다 훨씬
 짧다. 이 토큰 하나로 모든 그룹을 만들고 볼 수 있기 때문이다.
 
+## 그룹 관리자는 자기 그룹 밖으로 못 나간다
+
+`scope=group_admin` 토큰은 `group_id` 를 함께 들고 있다. 권한 판단은 `AdminIdentity` 한
+곳에 모아 뒀다 — 라우트마다 손으로 쓰면 **한 군데만 빠뜨려도 다른 그룹이 그대로 샌다.**
+
+- `require_super()` — 그룹 생성·비활성화·복구·그룹 인증키 재발급
+- `require_group(group_id)` — 구성원 추가, 초대 코드 재발급
+- 목록 조회는 쿼리 자체를 좁힌다. `?group_id=` 로 남의 그룹을 지목해도 소용없다
+
+## 비활성 그룹은 세션까지 끊는다
+
+`get_current_user` 는 사용자를 찾은 뒤 **그룹이 살아 있는지도 본다.** 로그인만 막으면
+최대 30일 살아 있는 토큰이 남기 때문이다. `resolve_admin` 도 그룹 관리자 토큰에 같은
+검사를 한다 → [관리자 화면](admin-console.md)
+
 키 비교는 `secrets.compare_digest` 로 한다.
 
 # rate limit과 `Depends`의 함정

@@ -36,6 +36,32 @@ export function clearAdminToken() {
   notifyTokenChanged();
 }
 
+export interface AdminScope {
+  groupId: string;
+  groupName: string;
+}
+
+/**
+ * 그룹 관리자면 자기 그룹, 전체 관리자면 `null`.
+ *
+ * **토큰에서 직접 읽는다.** 권한과 표시를 따로 저장했더니 로그인 직후 한 번,
+ * 화면은 "전체 관리자" 인데 데이터는 그룹 범위인 상태가 나왔다. 출처를 하나로 두면
+ * 그 어긋남이 생길 자리가 없다. 서명은 검증하지 않는다 — 실제 권한은 서버가 토큰을
+ * 다시 열어 판단하고, 여기서 읽는 값은 화면 표시일 뿐이다.
+ */
+export function adminScopeOf(token: string | null): AdminScope | null {
+  if (!token) return null;
+  const payload = token.split('.')[1];
+  if (!payload) return null;
+  try {
+    const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    if (claims.scope !== 'group_admin') return null;
+    return { groupId: String(claims.group_id), groupName: String(claims.group_name ?? '') };
+  } catch {
+    return null;
+  }
+}
+
 /** 관리자 토큰이 죽었을 때 던진다. 화면은 이걸 보고 로그인 폼으로 돌아간다. */
 export class AdminAuthError extends Error {}
 
@@ -82,6 +108,9 @@ export async function adminLogin(adminKey: string): Promise<void> {
 export interface AdminGroup {
   id: string;
   name: string;
+  is_active: boolean;
+  /** 그룹 관리자 인증키. **전체 관리자에게만** 내려온다. */
+  admin_code: string | null;
 }
 
 export interface AdminUser {
@@ -124,4 +153,16 @@ export async function createUser(
 
 export async function regenerateInviteCode(userId: string): Promise<AdminUser> {
   return adminRequest<AdminUser>(`/api/admin/users/${userId}/invite-code`, { method: 'POST' });
+}
+
+export async function deactivateGroup(groupId: string): Promise<AdminGroup> {
+  return adminRequest<AdminGroup>(`/api/admin/groups/${groupId}/deactivate`, { method: 'POST' });
+}
+
+export async function restoreGroup(groupId: string): Promise<AdminGroup> {
+  return adminRequest<AdminGroup>(`/api/admin/groups/${groupId}/restore`, { method: 'POST' });
+}
+
+export async function regenerateGroupAdminCode(groupId: string): Promise<AdminGroup> {
+  return adminRequest<AdminGroup>(`/api/admin/groups/${groupId}/admin-code`, { method: 'POST' });
 }
