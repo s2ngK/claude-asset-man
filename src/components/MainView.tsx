@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import AddEntryModal from '@/components/AddEntryModal';
 import AppNav, { SIDEBAR_WIDTH } from '@/components/AppNav';
+import MonthPicker from '@/components/MonthPicker';
 import TransactionItem from '@/components/TransactionItem';
 import UndoToast from '@/components/UndoToast';
 import { Transaction, TransactionType } from '@/types';
@@ -221,15 +222,9 @@ export default function MainView() {
       <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 p-4">
         <div className="flex items-center justify-between max-w-md lg:max-w-5xl mx-auto">
           <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              {/* required 를 주면 크롬 월 선택기에서 [삭제](지우기)가 사라진다. 값을 비우면
-                  month 파라미터가 빠져 그 달이 아니라 전체가 조회되므로, 애초에 못 비우게 한다.
-                  다른 브라우저를 대비해 onChange 에서도 빈 값을 막는다. */}
-              <input type="month" value={currentMonth} required
-                onChange={(e) => { if (e.target.value) setCurrentMonth(e.target.value); }}
-                className="bg-transparent text-lg font-bold border-none p-0 focus:ring-0 cursor-pointer" />
-              <span className="material-symbols-outlined text-slate-400">expand_more</span>
-            </div>
+            {/* 네이티브 월 입력을 쓰지 않는다 — 브라우저 달력은 앱과 따로 놀고, 크롬에서는
+                값을 비우는 [삭제] 까지 들어 있었다 (→ src/components/MonthPicker.tsx) */}
+            <MonthPicker value={currentMonth} onChange={setCurrentMonth} labelClassName="text-lg" className="-ml-2" />
             <p className="text-xs text-slate-500 font-medium">{user?.display_name ?? ''}</p>
           </div>
           <div className="flex items-center gap-1">

@@ -195,3 +195,37 @@ def test_me_reports_group_admin(client, auth_headers, group_mate):
     token = client.post("/api/auth/login", json={"invite_code": group_mate.invite_code}).json()["access_token"]
     body = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
     assert body["is_group_admin"] is False
+
+
+def test_color_does_not_collide_with_system_categories(client, auth_headers, category):
+    """시스템 기본값과 같은 색이 배정되면 차트에서 두 조각이 같은 색으로 나온다."""
+    created = _create(client, auth_headers, name="반려동물").json()
+    assert created["color"] != category.color
+
+
+def test_color_may_repeat_across_types(client, auth_headers, db_session, category):
+    """수입과 지출은 같은 차트에 함께 그려지지 않는다 — 색을 나눠 쓸 이유가 없다."""
+    from app import models
+
+    db_session.add(
+        models.Category(
+            id="sys-income",
+            group_id=None,
+            type="income",
+            name="급여",
+            color=category.color,
+            is_default=True,
+        )
+    )
+    db_session.commit()
+
+    # 지출 쪽 색만 피하면 되므로, 수입에 쓰인 색이 막지 않는다
+    made = _create(client, auth_headers, name="상여", type_="income").json()
+    assert made["color"] is not None
+
+
+def test_colors_keep_rotating_after_the_palette_runs_out(client, auth_headers, category):
+    """여덟 개를 다 쓴 뒤에도 색이 돌아야 한다 — 9번째부터 전부 같은 색이면 안 된다."""
+    colors = [_create(client, auth_headers, name=f"카테고리{i}").json()["color"] for i in range(12)]
+    tail = colors[-4:]
+    assert len(set(tail)) > 1, tail

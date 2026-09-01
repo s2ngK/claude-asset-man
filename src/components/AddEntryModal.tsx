@@ -6,6 +6,7 @@ import { TransactionType } from '@/types';
 import { cn } from '@/lib/utils';
 import type { Category as ApiCategory } from '@/lib/api';
 import { Button } from './ui/button';
+import DatePicker from '@/components/DatePicker';
 
 interface AddEntryModalProps {
   onClose: () => void;
@@ -149,10 +150,9 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
         <div className="flex gap-4">
           <div className="flex-1 flex flex-col gap-2">
             <span className="text-slate-400 text-xs font-bold px-1">날짜</span>
-            <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl h-14 px-4 flex items-center">
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                className="bg-transparent border-none text-slate-700 dark:text-slate-200 font-medium text-sm w-full outline-none" />
-            </div>
+            {/* 네이티브 날짜 입력을 쓰지 않는다 — 브라우저 달력은 앱과 따로 논다
+                (→ src/components/DatePicker.tsx) */}
+            <DatePicker value={date} onChange={setDate} />
           </div>
           <div className="flex-1 flex flex-col gap-2">
             <span className="text-slate-400 text-xs font-bold px-1">카테고리</span>

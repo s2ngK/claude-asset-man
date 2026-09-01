@@ -53,7 +53,13 @@ def create_category(
     if duplicate:
         raise HTTPException(status_code=409, detail=f"이미 있는 카테고리입니다: {name}")
 
-    used = [c.color for c in db.query(models.Category).filter(models.Category.group_id == current_user.group_id).all()]
+    # **보이는 것 전부**를 기준으로 안 쓴 색을 고른다. 자기 그룹 것만 보면 시스템 기본값과
+    # 같은 색이 배정돼, 차트에서 두 조각이 같은 색으로 나온다.
+    # 같은 type 만 센다 — 지출 차트에 수입 카테고리는 함께 그려지지 않으므로 색을 나눠 쓸 이유가 없다.
+    used = [
+        c.color
+        for c in visible_categories(db, current_user.group_id).filter(models.Category.type == payload.type).all()
+    ]
     category = models.Category(
         id=str(uuid.uuid4()),
         group_id=current_user.group_id,

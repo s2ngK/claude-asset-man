@@ -31,9 +31,13 @@ def next_color(used: Iterable[str | None]) -> str:
     사용자에게 색을 고르게 하지 않는 이유가 여기 있다 — 자유롭게 고르면 검증을
     통과하지 못하는 값이 들어온다. 다 썼으면 처음부터 다시 쓴다. 9번째부터는 색이
     겹치지만, 색 말고도 이름·아이콘이 항상 함께 표시되므로 못 읽게 되지는 않는다.
+
+    다 쓴 뒤의 자리는 **개수**로 정한다. 서로 다른 색의 가짓수로 정하면 그 값이 더 늘지
+    않아(이미 여덟 개를 다 썼으므로) 9번째부터 전부 같은 색이 된다.
     """
-    taken = {color for color in used if color}
+    used_list = [color for color in used if color]
+    taken = set(used_list)
     for color in CATEGORICAL_COLORS:
         if color not in taken:
             return color
-    return CATEGORICAL_COLORS[len(taken) % len(CATEGORICAL_COLORS)]
+    return CATEGORICAL_COLORS[len(used_list) % len(CATEGORICAL_COLORS)]
