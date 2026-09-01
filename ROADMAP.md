@@ -9,15 +9,13 @@
 - [ ] 코드 리뷰에서 나온 결함 13건 해결 — [#5 ~ #17](https://github.com/s2ngK/claude-asset-man/issues?q=is%3Aissue+is%3Aopen+label%3A%22코드리뷰+2026-08%22)
   - 권장 순서: #6(입력 검증) → #5(그룹 소유권) → #7(삭제 타이머) → #8+#9(Docker 배포) → #12+#10(fail-fast) → #11(401 처리)
 
-- [ ] [#41](https://github.com/s2ngK/claude-asset-man/issues/41) 그룹 전용 카테고리 관리 (`feat/41-group-categories`)
-- [ ] [#42](https://github.com/s2ngK/claude-asset-man/issues/42) 데스크톱 반응형 (`feat/42-desktop-responsive`)
+- [ ] [#43](https://github.com/s2ngK/claude-asset-man/issues/43) 캘린더형 일별 수입·지출 소계 (`feat/43-daily-calendar`)
 
 
 ## 다음 작업 (백로그)
 
 - [x] 유출됐던 Supabase Personal Access Token 재발급/폐기 확인 (git 히스토리에선 제거 완료, 토큰 자체 회전 필요) - 별도 작업으로 프로젝트 자체 폐기
 - [x] `update-claude-md`, `change-claude` 스테일 브랜치 정리 여부 결정 (둘 다 main에 완전히 흡수된 상태) - 브랜치 정리
-- [ ] [#43](https://github.com/s2ngK/claude-asset-man/issues/43) 캘린더형 일별 수입·지출 소계
 - [ ] [#44](https://github.com/s2ngK/claude-asset-man/issues/44) 대출·예적금 탭 — **요구사항 정의서를 다시 쓰기로 했다.** 무엇을 관리할지(상환 일정까지 vs 잔액만) 정해야 테이블이 나온다
 - [ ] 프론트엔드 화면 수가 늘어나면 서버 상태관리 라이브러리(react-query 등) 도입 검토
 
@@ -35,6 +33,11 @@
 
 ## 완료
 
+- [x] [#41](https://github.com/s2ngK/claude-asset-man/issues/41) 카테고리 관리 — 그룹 전용은 그룹 관리자, 공통은 전체 관리자 (PR #46)
+- [x] [#42](https://github.com/s2ngK/claude-asset-man/issues/42) 데스크톱 반응형 (PR #47)
+- [x] 입력/수정 모달을 바깥 클릭·Esc 로 닫기 (PR #48). 호버 삭제는 금액 정렬을 깨뜨려 물렀다
+- [x] 내가 쓴 내역을 뱃지·음영·강조 막대로 구분 (PR #49)
+- [x] 목록 필터에 구성원 추가 (PR #50)
 - [x] 그룹 관리자를 최초 초대 사용자 한 명으로 고정 (PR #45)
 - [x] 그룹 비활성화(복구 가능)와 그룹 관리자 (PR #40)
 - [x] #33 — 관리자 화면(`/admin`): 그룹·구성원·초대 코드 관리 (PR #39)

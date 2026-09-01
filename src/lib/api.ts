@@ -161,6 +161,7 @@ export async function getCategories(): Promise<Category[]> {
 export interface MonthlySummary { income: number; expense: number; balance: number; }
 export interface CategoryStat { category_id: string; category_name: string; icon: string | null; color: string | null; total: number; percentage: number; }
 export interface TrendItem { month: string; income: number; expense: number; }
+export interface DailyTotal { date: string; income: number; expense: number; }
 export interface MemberStat { user_id: string; display_name: string; total: number; percentage: number; }
 
 export async function createCategory(data: {
@@ -181,6 +182,11 @@ export async function getSummary(month: string, userOnly = false): Promise<Month
 
 export async function getCategoryStats(month: string, userOnly = false): Promise<CategoryStat[]> {
   return request<CategoryStat[]>(`/api/stats/categories?month=${month}&user_only=${userOnly}`);
+}
+
+/** 그 달의 날짜별 수입·지출. **거래가 없는 날은 안 온다** — 달력 칸은 화면에서 채운다. */
+export async function getDailyTotals(month: string, userOnly = false): Promise<DailyTotal[]> {
+  return request<DailyTotal[]>(`/api/stats/daily?month=${month}&user_only=${userOnly}`);
 }
 
 export async function getTrend(): Promise<TrendItem[]> {

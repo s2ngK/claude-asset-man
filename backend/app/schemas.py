@@ -129,6 +129,12 @@ class CategoryStat(BaseModel):
     percentage: float
 
 
+class DailyTotal(BaseModel):
+    date: str  # "YYYY-MM-DD"
+    income: int
+    expense: int
+
+
 class TrendItem(BaseModel):
     month: str
     income: int

@@ -191,3 +191,78 @@ def test_stats_require_auth(client):
     )
     for path in paths:
         assert client.get(path).status_code in (401, 403)
+
+
+# ── daily (#43) ──────────────────────────────────────────────────────────────
+
+
+def test_daily_groups_by_date(client, auth_headers, db_session, user, category):
+    _tx(db_session, user=user, category=category, amount=1000, day="03", tx_id="d1")
+    _tx(db_session, user=user, category=category, amount=2000, day="03", tx_id="d2")
+    _tx(db_session, user=user, category=category, amount=5000, day="10", tx_id="d3")
+
+    body = client.get(f"/api/stats/daily?month={THIS_MONTH}", headers=auth_headers).json()
+    assert body == [
+        {"date": f"{THIS_MONTH}-03", "income": 0, "expense": 3000},
+        {"date": f"{THIS_MONTH}-10", "income": 0, "expense": 5000},
+    ]
+
+
+def test_daily_separates_income_and_expense_on_the_same_day(client, auth_headers, db_session, user, category):
+    _tx(db_session, user=user, category=category, amount=1000, day="07", tx_id="d1")
+    _tx(db_session, user=user, category=category, amount=9000, day="07", type_="income", tx_id="d2")
+
+    body = client.get(f"/api/stats/daily?month={THIS_MONTH}", headers=auth_headers).json()
+    assert body == [{"date": f"{THIS_MONTH}-07", "income": 9000, "expense": 1000}]
+
+
+def test_daily_skips_days_with_no_transactions(client, auth_headers, db_session, user, category):
+    """빈 날을 서버가 만들어 보내지 않는다 — 달력 칸을 채우는 일은 화면 몫이다."""
+    _tx(db_session, user=user, category=category, amount=1000, day="15")
+
+    body = client.get(f"/api/stats/daily?month={THIS_MONTH}", headers=auth_headers).json()
+    assert len(body) == 1
+
+
+def test_daily_is_sorted_by_date(client, auth_headers, db_session, user, category):
+    for day in ("21", "05", "13"):
+        _tx(db_session, user=user, category=category, amount=1000, day=day, tx_id=f"d{day}")
+
+    body = client.get(f"/api/stats/daily?month={THIS_MONTH}", headers=auth_headers).json()
+    assert [row["date"] for row in body] == sorted(row["date"] for row in body)
+
+
+def test_daily_ignores_other_months(client, auth_headers, db_session, user, category):
+    _tx(db_session, user=user, category=category, amount=1000, day="02")
+    _tx(db_session, user=user, category=category, amount=9999, month=LAST_MONTH, day="02", tx_id="old")
+
+    body = client.get(f"/api/stats/daily?month={THIS_MONTH}", headers=auth_headers).json()
+    assert [row["expense"] for row in body] == [1000]
+
+
+def test_daily_user_only(client, auth_headers, db_session, user, group_mate, category):
+    _tx(db_session, user=user, category=category, amount=1000, day="09", tx_id="mine")
+    _tx(db_session, user=group_mate, category=category, amount=4000, day="09", tx_id="mate")
+
+    every = client.get(f"/api/stats/daily?month={THIS_MONTH}", headers=auth_headers).json()
+    mine = client.get(f"/api/stats/daily?month={THIS_MONTH}&user_only=true", headers=auth_headers).json()
+    assert every[0]["expense"] == 5000
+    assert mine[0]["expense"] == 1000
+
+
+def test_daily_is_group_scoped(client, auth_headers, db_session, category, other_group_category):
+    from app import models
+
+    outsider = models.User(
+        id="daily-outsider", group_id=other_group_category.group_id, display_name="남", invite_code="DAILYOUT1"
+    )
+    db_session.add(outsider)
+    db_session.commit()
+    _tx(db_session, user=outsider, category=other_group_category, amount=77000, day="11")
+
+    body = client.get(f"/api/stats/daily?month={THIS_MONTH}", headers=auth_headers).json()
+    assert body == []
+
+
+def test_daily_requires_auth(client):
+    assert client.get(f"/api/stats/daily?month={THIS_MONTH}").status_code in (401, 403)

@@ -80,6 +80,50 @@ def get_category_stats(
     )
 
 
+@router.get("/daily", response_model=list[schemas.DailyTotal])
+def get_daily_totals(
+    month: str = Query(...),
+    user_only: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """그 달의 **날짜별** 수입·지출. 쿼리는 한 번만 나간다.
+
+    `date` 가 `"YYYY-MM-DD"` 문자열 컬럼이라 그대로 묶으면 된다. 날짜마다 따로 물으면
+    한 달에 서른 번이다 — 추이에서 한 번 겪은 N+1 이다 (#15).
+
+    **거래가 없는 날은 결과에 없다.** 달력 칸을 채우는 일은 화면에서 한다. 여기서 빈 날을
+    만들어 보내면 한 달치 응답이 늘 30줄이 되고, 그 30줄의 대부분이 0 이다.
+    """
+    filters = [
+        models.Transaction.group_id == current_user.group_id,
+        models.Transaction.date.startswith(month),
+    ]
+    if user_only:
+        filters.append(models.Transaction.user_id == current_user.id)
+
+    rows = (
+        db.query(
+            models.Transaction.date,
+            models.Transaction.type,
+            func.sum(models.Transaction.amount).label("total"),
+        )
+        .filter(*filters)
+        .group_by(models.Transaction.date, models.Transaction.type)
+        .all()
+    )
+
+    totals: dict[str, dict[str, int]] = {}
+    for row in rows:
+        day = totals.setdefault(row.date, {"income": 0, "expense": 0})
+        day[row.type] = row.total or 0
+
+    return [
+        schemas.DailyTotal(date=date_str, income=day["income"], expense=day["expense"])
+        for date_str, day in sorted(totals.items())
+    ]
+
+
 @router.get("/trend", response_model=list[schemas.TrendItem])
 def get_trend(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """최근 6개월 수입·지출. **쿼리는 한 번만 나간다.**
