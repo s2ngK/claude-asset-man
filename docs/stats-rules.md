@@ -8,24 +8,19 @@
 
 | 화면 | 무엇을 보여주나 | 어디서 오나 |
 |---|---|---|
-| `MainView` 상단 요약 | 이번 달 수입/지출/잔액 | **서버 아님.** 클라이언트 계산 |
-| `StatsView` 총 지출 + 파이 | 카테고리별 지출 | `GET /stats/categories` |
+| `MainView` 상단 요약 | 이번 달 수입/지출/잔액 | `GET /stats/summary` |
+| `MainView` 필터 요약줄 | 지금 걸러진 N건의 합 | **클라이언트.** 화면에 보이는 것에 대한 이야기다 |
+| `StatsView` 총 지출 + 도넛 | 카테고리별 지출 | `GET /stats/categories` |
+| `StatsView` 달력 | 날짜별 수입·지출 소계 | `GET /stats/daily` |
 | `StatsView` 6개월 추이 | 월별 수입/지출/잔액 | `GET /stats/trend` |
 | `StatsView` 구성원별 | 멤버별 지출 | `GET /stats/members` |
 
-## MainView 요약은 서버를 쓰지 않는다
-`GET /stats/summary`가 있고 `api.ts`에 `getSummary()` 래퍼까지 있는데 **아무도 호출하지 않는다.**
+## MainView 요약은 서버가 낸다
+한때 `getSummary()` 래퍼가 있는데도 아무도 부르지 않고, `MainView` 가 받아온 목록을
+`reduce` 해서 직접 더했다. 그 달 거래를 **전부** 받아오는 동안에는 결과가 같았지만
+**페이지네이션을 넣는 순간 화면의 합계가 조용히 틀려지는** 구조였다 (#14).
 
-대신 `MainView`가 이미 받아온 거래 목록을 `reduce`해서 직접 계산한다.
-
-```
-income  = 목록에서 type==='income'  합
-expense = 목록에서 type==='expense' 합
-balance = income - expense
-```
-
-지금은 그 달 거래를 **전부** 받아오므로 결과가 서버 계산과 같다.
-⚠️ **페이지네이션을 넣는 순간 화면의 합계가 조용히 틀려진다.** → [#14](https://github.com/s2ngK/claude-asset-man/issues/14) · [결함 목록](known-issues.md)
+지금은 서버가 낸 값만 쓴다. 자세한 것은 아래 "월 합계의 출처는 서버 하나다".
 
 # 집계 규칙
 
@@ -40,7 +35,7 @@ balance = income - expense
 `GET /stats/summary`와 `GET /stats/trend`는 income·expense를 **둘 다** 집계한다.
 
 ## `user_only` 플래그
-- `/stats/summary`, `/stats/categories`에만 있다
+- `/stats/summary`, `/stats/categories`, `/stats/daily`에만 있다
 - `StatsView`의 **내 통계 / 그룹 통계** 탭이 이걸 토글한다
 - `/stats/trend`와 `/stats/members`에는 **없다** — 추이는 항상 그룹 전체다
   - 즉 "내 통계" 탭에서도 6개월 추이 그래프는 **그룹 전체 수치**를 보여준다
@@ -84,17 +79,21 @@ API 경계에서는 [#6](https://github.com/s2ngK/claude-asset-man/issues/6)으�
 - **DB에 직접 쓴 행** — 마이그레이션, 수동 SQL, 시드 스크립트
 - **이미 저장돼 있던 행** — 검증이 붙기 전 데이터. 필요하면 한 번 훑어야 한다
 
-# 성능
+# 성능 — 집계는 모두 쿼리 한 번이다
 
-`GET /stats/trend`가 **월마다 쿼리를 따로 날린다** (6개월 = 6회).
+`/summary` `/categories` `/daily` `/trend` `/members` 전부 **`GROUP BY` 한 번**으로 끝난다.
+한때 `/trend` 만 달마다 따로 날려 6회였다 (#15). 아래 두 절에 각각의 방식을 적었다.
 
-SQLite의 `strftime`으로 월을 뽑아 `GROUP BY` 한 번에 끝낼 수 있다. 현재 규모에선 체감되지 않지만, 통계 테스트를 붙일 때 같이 정리하면 좋다. → [#15](https://github.com/s2ngK/claude-asset-man/issues/15) · [결함 목록](known-issues.md)
+날짜·월을 뽑는 데 `strftime` 대신 `substr` 을 쓴다 — `date` 가 `"YYYY-MM-DD"` 문자열
+컬럼이라 자리를 잘라내는 것으로 충분하고, SQLite 밖으로 옮길 때도 그대로 간다.
 
-# 테스트가 없다
+# 테스트
 
-`stats.py`는 **백엔드에서 가장 큰 파일(132줄)인데 테스트가 0개다.** 집계·정렬·퍼센트처럼 조용히 틀리기 쉬운 로직이 전부 여기 있는데도 그렇다.
+`backend/tests/test_stats.py` 24개가 이 문서의 규칙을 지킨다 — 그룹/개인 집계, 지출만 세기,
+퍼센트·정렬, 추이 6개월 창, 날짜별 소계. 집계·정렬·퍼센트는 **조용히 틀리는** 종류라
+규칙을 바꾸면 여기 테스트도 같이 고쳐야 한다 (#13).
 
-`backend/tests/conftest.py`에 in-memory SQLite 픽스처가 이미 있으니 그대로 쓰면 된다. → [#13](https://github.com/s2ngK/claude-asset-man/issues/13) · [결함 목록](known-issues.md)
+픽스처는 `backend/tests/conftest.py` 의 in-memory SQLite 를 그대로 쓴다.
 
 # 도넛은 상위 다섯 개까지만 색을 나눠 갖는다
 
@@ -137,8 +136,9 @@ SQLite의 `strftime`으로 월을 뽑아 `GROUP BY` 한 번에 끝낼 수 있다
 금액만 적으면 "식비가 전체의 얼마인가" 를 눈으로 가늠해야 한다. 구성원별 지출에는 원래부터
 `%` 가 있었으므로 표현도 어긋나 있었다 → [#32](https://github.com/s2ngK/claude-asset-man/issues/32)
 
-범례는 **상위 4개가 아니라 전부** 적는다. 잘라내면 나머지가 합쳐서 몇 %인지 알 수 없다.
-카테고리는 많아야 예닐곱 개라 전부 적어도 길지 않다.
+범례에 적는 것은 **상위 다섯 개와 `그 외 N개` 한 줄**이다. 잘라내기만 하면 나머지가
+합쳐서 몇 %인지 알 수 없으므로 묶음 줄에 금액과 비율을 함께 적는다 (→ 위 "도넛은 상위
+다섯 개까지만").
 
 # 카테고리 색은 눈으로 고르지 않는다
 

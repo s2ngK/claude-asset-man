@@ -26,10 +26,10 @@ uv run python -c "from app.main import app; import json; print(json.dumps(app.op
 
 # 자동 문서가 담아주는 것
 
-2026-08-27 기준 실제로 확인한 내용이다.
+2026-09-01 기준 실제로 확인한 내용이다 (위 명령으로 스펙을 뽑아 센 값).
 
-- 엔드포인트 **16개** 전부 (경로, 메서드, 쿼리 파라미터, 경로 파라미터)
-- 요청/응답 스키마 **15개** — Pydantic 모델에서 그대로 생성됨
+- 엔드포인트 **27개** 전부 (경로, 메서드, 쿼리 파라미터, 경로 파라미터)
+- 요청/응답 스키마 **20개** — Pydantic 모델에서 그대로 생성됨
 - `securitySchemes: HTTPBearer` — 어디에 토큰이 필요한지
 - 필수/선택 필드, 타입, 기본값
 
@@ -74,7 +74,7 @@ slowapi 데코레이터는 OpenAPI 스펙에 흔적을 남기지 않는다.
 - `PUT`/`DELETE`가 남의 그룹 데이터에 **404**를 주는 것 (403이 아니라 — 존재 자체를 숨긴다)
 - `type` 값이 `income`/`expense`여야 한다는 것 (스펙상 그냥 `string`)
 - `date` 형식이 `YYYY-MM-DD`여야 한다는 것 (스펙상 그냥 `string`)
-- 카테고리를 **이름으로** 찾는 프론트엔드의 결합 → [거래 등록 흐름](flow-create-transaction.md)
+- 카테고리 참조가 **`category_id` 하나**라는 것. 한때 프론트가 이름으로 찾았다 (#17) → [거래 등록 흐름](flow-create-transaction.md)
 
 이런 건 [엔드포인트별 규칙](api-rules.md)에 정리했다.
 
@@ -89,9 +89,15 @@ slowapi 데코레이터는 OpenAPI 스펙에 흔적을 남기지 않는다.
 
 **`NEXT_PUBLIC_*`은 빌드 시점에 번들에 인라인된다.** 런타임에 바꿀 수 없다 → [개발 환경 세팅](setup.md)
 
-## 쓰이지 않는 래퍼
-`api.ts`에 정의돼 있지만 아무도 호출하지 않는 것들:
+## 죽은 래퍼는 없다
+한때 `getSummary()`·`updateTransaction()`·`getMe()` 셋이 정의만 돼 있고 아무도 부르지 않았다.
+지금은 전부 쓰인다 — 요약 카드가 서버 합계를 쓰게 됐고(#14), 수정 플로우가 생겼고,
+설정·통계 화면이 `getMe()` 로 신원을 되묻는다.
 
-- `getSummary()` — `MainView`가 서버 대신 클라이언트에서 직접 합계를 낸다 → [통계 집계 규칙](stats-rules.md)
-- `updateTransaction()` — **수정 플로우가 구현돼 있지 않다**
-- `getMe()` — 로그인 응답에 이미 사용자 정보가 있어서 쓸 일이 없었다
+**새 래퍼를 추가하면 부르는 곳도 같은 PR에 넣는다.** 안 부르는 래퍼는 시그니처가 서버와
+어긋나도 아무도 모른다 — `TokenResponse` 가 `user_id` 대신 `id` 로 적혀 있던 것이 그렇게
+빌드를 깨뜨렸다.
+
+## 관리자 화면은 통로가 따로다
+`src/lib/adminApi.ts` 가 `/api/admin/*` 를 맡는다. 토큰이 다르고(`sessionStorage`) 만료도
+다르므로 `api.ts` 와 섞지 않는다 → [관리자 화면](admin-console.md)

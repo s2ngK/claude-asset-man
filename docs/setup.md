@@ -63,7 +63,7 @@ curl -X POST localhost:8000/api/admin/users \
 | `npm run lint` | 루트 | ESLint. **현재 0건 상태를 유지한다** |
 | `npx tsc --noEmit` | 루트 | 타입 체크 |
 | `npm run build` | 루트 | 프로덕션 빌드 (tsc 포함) |
-| `uv run pytest` | `backend/` | 테스트 15개 |
+| `uv run pytest` | `backend/` | 테스트 138개 |
 | `uv run ruff check .` | `backend/` | 파이썬 lint |
 | `uv run ruff format .` | `backend/` | 포맷 |
 | `uv run alembic revision --autogenerate -m "..."` | `backend/` | 모델 수정 후 **필수** |
@@ -128,11 +128,12 @@ cd backend && uv run pytest
 | 대상 | 테스트 | 덮인 것 |
 |---|---|---|
 | `auth.py` | 8 | 로그인 성공/실패, 토큰 검증, 만료 시각, rate limit |
-| `transactions.py` | 4 | CRUD, 없는 카테고리 거부, 그룹 스코핑 |
+| `transactions.py` | 24 | CRUD, 없는 카테고리 거부, 그룹 스코핑, 작성자만 수정·삭제, 입력 검증 |
 | `admin.py` | 51 | 헤더·토큰 인증, 토큰 상호 거부, 초대 코드 재발급, 그룹 비활성화·복구, 그룹 관리자 권한 경계와 지정, 공통 카테고리 |
 | `config.py` | 9 | 기본 시크릿 탐지, 프로덕션 기동 거부 |
-| `stats.py` | 16 | 그룹/개인 집계, 지출만 세기, 퍼센트·정렬, 추이 6개월 창 |
-| `categories.py` | 19 | 목록·격리·정렬, 그룹 전용 추가/삭제, 색 자동 배정, 삭제 시 `기타` 이동, 관리자 권한 |
+| `stats.py` | 24 | 그룹/개인 집계, 지출만 세기, 퍼센트·정렬, 추이 6개월 창, 날짜별 소계 |
+| `categories.py` | 22 | 목록·격리·정렬, 그룹 전용 추가/삭제, 색 자동 배정, 삭제 시 `기타` 이동, 관리자 권한 |
+| 합계 | **138** | |
 | 프론트엔드 | **0** | 의도적 보류 |
 
 # Docker

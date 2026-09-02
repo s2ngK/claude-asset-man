@@ -22,7 +22,13 @@
 
 # 목록
 
-발견일은 그 결함을 **확인한 날**이다. 아래 13건은 모두 2026-08-27 전체 코드 리뷰(`main` · b13e6ab)에서 한 번에 나왔다.
+발견일은 그 결함을 **확인한 날**이다. 아래 13건은 모두 2026-08-27 전체 코드 리뷰(`main` · b13e6ab)에서 한 번에 나왔고,
+**2026-08-28 로 전부 종료됐다** (PR #29·#34·#35·#36 등). 표를 남겨두는 이유는 무엇이 어떻게
+잘못됐었는지가 남아야 같은 실수를 다시 안 하기 때문이다.
+
+이 리뷰 **이후에** 나온 결함(#30·#31·#32·#37 등)은 표에 옮기지 않고 GitHub 이슈에만 둔다.
+한 번의 리뷰에서 나온 묶음이라는 것이 이 표의 의미고, 그때그때 나온 것까지 넣으면 그냥
+이슈 목록의 사본이 된다.
 
 | 이슈 | 상태 | 심각도 | 발견일 | 내용 | 위치 | 관련 문서 |
 |---|---|---|---|---|---|---|
@@ -87,16 +93,21 @@ $ npm run build && ls -d .next/standalone → No such file or directory
 
 Docker 데몬이 꺼져 있어 이미지 빌드 자체는 실행하지 못했다. COPY 원본이 존재하지 않는다는 사실까지만 확인.
 
-# 권장 처리 순서
+# 처리한 순서
 
-심각도와 비용을 함께 본 순서다. 완료 여부는 위 표의 뱃지로 확인한다.
+심각도와 비용을 함께 본 순서로 처리했고, 실제로 이 순서대로 나갔다.
 
-1. [#6](https://github.com/s2ngK/claude-asset-man/issues/6) — Pydantic 스키마 한 파일로 구멍 3개가 한 번에 막힌다. 비용 최저, 효과 최대
-2. [#5](https://github.com/s2ngK/claude-asset-man/issues/5) — 필터를 헬퍼로 빼서 목록 조회와 참조 검증이 같은 조건을 보게 한다
-3. [#7](https://github.com/s2ngK/claude-asset-man/issues/7) — 사용자가 실제로 겪는 유일한 데이터 유실 경로
-4. [#8](https://github.com/s2ngK/claude-asset-man/issues/8) + [#9](https://github.com/s2ngK/claude-asset-man/issues/9) — 둘 다 한 줄 수정. 고친 뒤 **실제로 `docker compose up --build`를 돌려 확인**하는 것까지가 작업
-5. [#12](https://github.com/s2ngK/claude-asset-man/issues/12) + [#10](https://github.com/s2ngK/claude-asset-man/issues/10) — `lifespan`에서 한 번 검사하면 둘 다 처리. 외부 노출 계획이 있으면 순위를 올린다
-6. [#11](https://github.com/s2ngK/claude-asset-man/issues/11) — `request()` 한 곳만 고치면 된다
+1. [#6](https://github.com/s2ngK/claude-asset-man/issues/6) — Pydantic 스키마 한 파일로 구멍 3개가 한 번에 막혔다. 비용 최저, 효과 최대
+2. [#5](https://github.com/s2ngK/claude-asset-man/issues/5) — 필터를 헬퍼(`queries.visible_categories`)로 빼서 목록 조회와 참조 검증이 같은 조건을 본다
+3. [#7](https://github.com/s2ngK/claude-asset-man/issues/7) — 사용자가 실제로 겪던 유일한 데이터 유실 경로
+4. [#8](https://github.com/s2ngK/claude-asset-man/issues/8) + [#9](https://github.com/s2ngK/claude-asset-man/issues/9) — 둘 다 한 줄 수정. 고친 뒤 **실제로 `docker compose up --build` 를 돌려 확인**하는 것까지가 작업이었다
+5. [#12](https://github.com/s2ngK/claude-asset-man/issues/12) + [#10](https://github.com/s2ngK/claude-asset-man/issues/10) — `lifespan` 에서 한 번 검사(`config.verify_startup_config`)해 둘 다 처리
+6. [#11](https://github.com/s2ngK/claude-asset-man/issues/11) — `request()` 한 곳만 고쳤다
+7. [#13](https://github.com/s2ngK/claude-asset-man/issues/13) ~ [#17](https://github.com/s2ngK/claude-asset-man/issues/17) — 남은 품질 이슈를 한 번에 (PR #36)
+
+> [!TIP] 이 순서가 준 교훈
+> **가장 싼 수정이 가장 넓게 막는 자리**를 먼저 찾는다. #6 은 스키마 한 파일이었는데
+> `type`·`amount`·`date` 세 구멍을 동시에 닫았다.
 
 # 라벨
 
@@ -105,4 +116,7 @@ Docker 데몬이 꺼져 있어 이미지 빌드 자체는 실행하지 못했다
 - `품질` — 지금은 괜찮지만 곧 문제가 되는 것
 - `코드리뷰 2026-08` — 이 리뷰에서 나온 항목 전체
 
-새 결함을 발견하면 이슈로 등록하고 위 표에 행을 추가한다. **상태는 적지 않는다** — 뱃지가 대신한다.
+새 결함을 발견하면 **GitHub 이슈로만** 등록한다. 위 표는 2026-08 리뷰 묶음의 기록이라
+행을 더 붙이지 않는다. 다음 전체 리뷰를 돌리면 그때 새 절을 연다.
+
+어떤 형태로 적든 **상태는 문서에 적지 않는다** — 뱃지가, 그리고 이슈 자체가 대신한다.

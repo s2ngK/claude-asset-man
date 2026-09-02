@@ -55,8 +55,9 @@ erDiagram
 ## `categories.group_id IS NULL` = 시스템 기본값
 - 시작 시 `seed.py`가 10개를 심는다. **이미 카테고리가 하나라도 있으면 시딩을 건너뛴다**
 - 조회 시 `group_id IS NULL OR group_id = 내 그룹`으로 필터한다 (`routes/categories.py`)
-- 그룹 전용 카테고리를 만드는 기능은 **아직 없다.** API에 카테고리 생성 엔드포인트가 없다
-- 이 기능을 추가할 때 반드시 [결함 목록](known-issues.md)의 [#5](https://github.com/s2ngK/claude-asset-man/issues/5)을 먼저 고쳐야 한다
+- 그룹 전용 카테고리는 **그룹 관리자만** 만들고 지운다 (`POST`/`DELETE /api/categories`) → [거래 등록 흐름](flow-create-transaction.md)
+- 시스템 기본값(`group_id IS NULL`)은 **전체 관리자만** 만지고, 여기서 하나를 지우면 그것을 쓰던 **모든 그룹**의 거래가 `기타` 로 옮겨간다 → [관리자 화면](admin-console.md)
+- 색은 사용자가 고르지 않는다. `palette.py` 가 배정한다 → [통계 집계 규칙](stats-rules.md)
 
 ## 시스템 기본 카테고리 10개
 `backend/app/seed.py` 기준.
