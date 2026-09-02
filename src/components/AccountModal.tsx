@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import DatePicker from '@/components/DatePicker';
 import { KIND_LABEL, REPAY_LABEL } from '@/lib/accounts';
-import type { Account, AccountInput, AccountKind, RepayMethod } from '@/lib/api';
+import type { Account, AccountInput, AccountKind, Category, RepayMethod } from '@/lib/api';
 
 const KINDS: AccountKind[] = ['loan', 'deposit', 'installment'];
 const METHODS: RepayMethod[] = ['equal_payment', 'equal_principal', 'bullet'];
@@ -33,10 +33,13 @@ const oneYearOut = () => {
 export default function AccountModal({
   onClose,
   onSave,
+  categories,
   initial,
 }: {
   onClose: () => void;
   onSave: (data: AccountInput) => void;
+  /** 지출 카테고리만 받는다 — 계좌를 움직이는 거래는 언제나 지출이다. */
+  categories: Category[];
   initial?: Account;
 }) {
   const isEditing = initial !== undefined;
@@ -47,6 +50,7 @@ export default function AccountModal({
   const [startedOn, setStartedOn] = useState(initial?.started_on ?? new Date().toISOString().slice(0, 10));
   const [maturesOn, setMaturesOn] = useState(initial?.matures_on ?? oneYearOut());
   const [repayMethod, setRepayMethod] = useState<RepayMethod>(initial?.repay_method ?? 'equal_payment');
+  const [categoryId, setCategoryId] = useState(initial?.category_id ?? '');
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -67,6 +71,7 @@ export default function AccountModal({
       rate: Number(rate) || 0,
       started_on: startedOn,
       matures_on: maturesOn,
+      category_id: categoryId || null,
       // 대출이 아니면 서버가 어차피 지운다. 여기서도 보내지 않아 뜻을 분명히 한다.
       repay_method: kind === 'loan' ? repayMethod : null,
     });
@@ -173,6 +178,23 @@ export default function AccountModal({
             </div>
           </div>
           {!datesOk && <p className="text-[11px] font-bold text-rose-500 px-1">만기일이 시작일보다 빠릅니다.</p>}
+
+          {/* 상환·납입 내역을 넣을 때마다 카테고리를 다시 고르지 않게 여기서 한 번 정해둔다. */}
+          <div className="flex flex-col gap-2">
+            <span className="text-slate-400 text-xs font-bold px-1">
+              {kind === 'loan' ? '상환' : '납입'} 카테고리
+            </span>
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}
+              className={cn(field, 'appearance-none')}>
+              <option value="">고르지 않음</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.icon ?? ''} {c.name}</option>
+              ))}
+            </select>
+            <span className="text-[11px] text-slate-400 px-1">
+              내역에서 이 계좌를 고르면 카테고리가 자동으로 선택됩니다. 지출 카테고리만 고를 수 있습니다.
+            </span>
+          </div>
 
           <p className="text-[11px] text-slate-400 px-1">
             잔액은 저장하지 않습니다 — 이 계좌에 연결한 내역에서 계산합니다.

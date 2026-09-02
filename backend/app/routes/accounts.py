@@ -46,6 +46,21 @@ def _own_account(db: Session, account_id: str, user: models.User) -> models.Acco
     return account
 
 
+def _require_expense_category(db: Session, category_id: str, group_id: str) -> None:
+    """계좌의 기본 카테고리는 **이 그룹이 쓸 수 있는 지출 카테고리**여야 한다.
+
+    계좌를 움직이는 거래는 언제나 지출이다 (상환·납입·예치). 수입 카테고리를 달아두면
+    그 계좌를 연결하는 순간 화면이 저장할 수 없는 조합을 고르게 된다.
+    """
+    found = (
+        visible_categories(db, group_id)
+        .filter(models.Category.id == category_id, models.Category.type == "expense")
+        .first()
+    )
+    if not found:
+        raise HTTPException(status_code=404, detail="지출 카테고리를 찾을 수 없습니다.")
+
+
 def _normalize(kind: str, data: dict) -> dict:
     """대출이 아닌 계좌의 `repay_method` 를 지운다.
 
@@ -65,6 +80,9 @@ def serialize(account: models.Account, principal: int = 0, interest: int = 0) ->
         user_display_name=account.user.display_name if account.user else None,
         kind=account.kind,
         name=account.name,
+        category_id=account.category_id,
+        category_name=account.category.name if account.category else None,
+        category_icon=account.category.icon if account.category else None,
         amount=account.amount,
         rate=account.rate,
         started_on=account.started_on,
@@ -94,7 +112,9 @@ def list_accounts(
 
     소유는 개인이지만 **열람은 그룹**이다 — 가계부의 다른 모든 읽기와 같다.
     """
-    q = visible_accounts(db, current_user.group_id).options(joinedload(models.Account.user))
+    q = visible_accounts(db, current_user.group_id).options(
+        joinedload(models.Account.user), joinedload(models.Account.category)
+    )
     if kind:
         q = q.filter(models.Account.kind == kind)
     totals = account_totals(db, current_user.group_id)
@@ -111,6 +131,8 @@ def create_account(
     """계좌를 만든다. **주인은 만든 사람**이다 — 요청 본문으로 지정할 수 없다."""
     if payload.matures_on < payload.started_on:
         raise HTTPException(status_code=422, detail="만기일이 시작일보다 빠를 수 없습니다.")
+    if payload.category_id:
+        _require_expense_category(db, payload.category_id, current_user.group_id)
 
     account = models.Account(
         id=str(uuid.uuid4()),
@@ -134,6 +156,8 @@ def update_account(
 ):
     account = _own_account(db, account_id, current_user)
     changes = _storable(payload.model_dump(exclude_unset=True))
+    if changes.get("category_id"):
+        _require_expense_category(db, changes["category_id"], current_user.group_id)
     if "repay_method" in changes:
         changes = _normalize(account.kind, changes)
 

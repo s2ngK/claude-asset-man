@@ -55,6 +55,7 @@ erDiagram
         string user_id FK "소유자"
         string kind "loan / deposit / installment"
         string name
+        string category_id FK "상환·납입 기본 카테고리(지출만)"
         int amount "kind가 뜻을 정한다"
         float rate "연이율 — 예상치 계산용"
         string started_on "YYYY-MM-DD"
@@ -119,6 +120,9 @@ erDiagram
 `transactions.account_id` 와 `interest_amount` 는 둘 다 nullable 이고 **대부분의 행에서 비어
 있다.** 계좌와 무관한 거래가 정상이기 때문이다 — 미래를 위한 빈 자리가 아니라 실제로 쓰이는
 sparse 컬럼이다.
+
+`accounts.category_id` 는 **지출 카테고리만** 가리킨다 (라우트에서 검증). 계좌를 움직이는
+거래는 언제나 지출이라서다 — `type == "income"` 인 거래는 계좌에 붙지 않는다.
 
 # 그룹은 지우지 않는다
 

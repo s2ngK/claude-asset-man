@@ -72,14 +72,19 @@ def _require_usable_account(db: Session, account_id: str, group_id: str) -> None
 
 
 def _check_account_fields(
-    db: Session, account_id: str | None, interest: int | None, amount: int, group_id: str
+    db: Session, account_id: str | None, interest: int | None, amount: int, tx_type: str, group_id: str
 ) -> None:
     """계좌 연결과 이자분이 앞뒤가 맞는지 본다. **저장 뒤의 상태**를 기준으로 판단한다.
 
+    - **수입 거래는 계좌에 붙일 수 없다.** 잔액 계산이 부호를 보지 않아서, 붙이면 수입이
+      빚을 깎는다 (500만원 급여가 대출 잔액을 500만원 줄였다). 계좌를 움직이는 거래는
+      상환·납입·예치뿐이고 전부 지출이다. 받은 이자는 정산이 따로 만들고 계좌에 붙지 않는다
     - 계좌 없이 이자분만 있으면 그 값은 아무 데도 안 쓰인다 (잔액은 계좌별로 낸다)
     - 이자가 금액보다 크면 원금분이 음수가 되어 잔액이 거꾸로 늘어난다
     """
     if account_id is not None:
+        if tx_type != "expense":
+            raise HTTPException(status_code=422, detail="수입 내역은 계좌에 연결할 수 없습니다.")
         _require_usable_account(db, account_id, group_id)
     elif interest:
         raise HTTPException(status_code=422, detail="계좌를 연결하지 않으면 이자분을 넣을 수 없습니다.")
@@ -148,7 +153,9 @@ def create_transaction(
     current_user: models.User = Depends(get_current_user),
 ):
     _require_usable_category(db, payload.category_id, current_user.group_id)
-    _check_account_fields(db, payload.account_id, payload.interest_amount, payload.amount, current_user.group_id)
+    _check_account_fields(
+        db, payload.account_id, payload.interest_amount, payload.amount, payload.type, current_user.group_id
+    )
     tx = models.Transaction(
         id=str(uuid.uuid4()),
         group_id=current_user.group_id,
@@ -176,6 +183,7 @@ def update_transaction(
         changes.get("account_id", tx.account_id),
         changes.get("interest_amount", tx.interest_amount),
         changes.get("amount", tx.amount),
+        changes.get("type", tx.type),
         current_user.group_id,
     )
     for field, value in changes.items():

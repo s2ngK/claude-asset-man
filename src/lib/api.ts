@@ -218,6 +218,10 @@ export interface Account {
   user_display_name: string | null;
   kind: AccountKind;
   name: string;
+  /** 상환·납입 내역에 기본으로 붙일 **지출** 카테고리. 비어 있으면 화면이 안 건드린다. */
+  category_id: string | null;
+  category_name: string | null;
+  category_icon: string | null;
   /** 대출: 대출 원금 · 예금: 예치액 · **적금: 월 납입액**(잔액이 아니다). */
   amount: number;
   rate: number;
@@ -236,6 +240,7 @@ export interface Account {
 export interface AccountInput {
   kind: AccountKind;
   name: string;
+  category_id?: string | null;
   amount: number;
   rate: number;
   started_on: string;

@@ -179,6 +179,8 @@ class UserCreate(BaseModel):
 class AccountCreate(BaseModel):
     kind: AccountKind
     name: str = Field(min_length=1, max_length=40)
+    # 상환·납입 내역에 기본으로 붙일 **지출** 카테고리. 안 주면 화면이 카테고리를 안 건드린다.
+    category_id: str | None = None
     # kind 가 이 값의 뜻을 정한다 — 대출: 대출 원금 · 예금: 예치액 · 적금: 월 납입액.
     amount: int = Field(gt=0)
     # 연이율(%). 예상액을 계산해 보여주는 데만 쓴다.
@@ -191,6 +193,7 @@ class AccountCreate(BaseModel):
 
 class AccountUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=40)
+    category_id: str | None = None
     amount: int | None = Field(default=None, gt=0)
     rate: float | None = Field(default=None, ge=0, le=100)
     started_on: date_type | None = None
@@ -219,6 +222,9 @@ class AccountResponse(BaseModel):
     user_display_name: str | None = None
     kind: str
     name: str
+    category_id: str | None = None
+    category_name: str | None = None
+    category_icon: str | None = None
     amount: int
     rate: float
     started_on: str

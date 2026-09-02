@@ -73,6 +73,8 @@ export default function AccountsView() {
 
   const totalAsset = assets.reduce((sum, a) => sum + a.balance, 0);
   const totalDebt = debts.reduce((sum, a) => sum + a.balance, 0);
+  // 계좌의 기본 카테고리는 지출만이다 — 계좌를 움직이는 거래는 상환·납입·예치뿐이다.
+  const expenseCategories = categories.filter(c => c.type === 'expense');
 
   return (
     <div className={cn('min-h-screen bg-slate-50 dark:bg-slate-950 pb-24 lg:pb-8', SIDEBAR_WIDTH)}>
@@ -152,10 +154,12 @@ export default function AccountsView() {
 
       {creating && (
         <AccountModal onClose={() => setCreating(false)}
+          categories={expenseCategories}
           onSave={(data: AccountInput) => run(() => createAccount(data))} />
       )}
       {editing && (
         <AccountModal initial={editing} onClose={() => setEditing(null)}
+          categories={expenseCategories}
           onSave={(data: AccountInput) => run(() => updateAccount(editing.id, data))} />
       )}
       {settling && (
@@ -243,6 +247,7 @@ function Card({
             {mine && <span className="text-emerald-600 dark:text-emerald-400 font-bold"> · 나</span>}
             {' · '}연 {account.rate}%
             {account.repay_method && ` · ${REPAY_LABEL[account.repay_method]}`}
+            {account.category_name && ` · ${account.category_icon ?? ''}${account.category_name}`}
           </p>
         </div>
         <div className="ml-auto text-right shrink-0">

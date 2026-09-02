@@ -107,9 +107,13 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
 
   const canSave = amountToSave > 0 && categoriesReady && selectedCatId !== '';
 
-  // 고른 계좌는 **읽을 때 파생시킨다.** 목록이 바뀌어 사라진 id 가 남아 있어도
-  // 화면과 state 가 어긋나지 않는다 (카테고리 선택과 같은 방식).
-  const linkedAccount = accounts.find(a => a.id === accountId) ?? null;
+  // 고른 계좌는 **읽을 때 파생시킨다.** 목록이 바뀌어 사라진 id 가 남아 있어도,
+  // 계좌를 고른 뒤 수입으로 바꿔도 화면과 state 가 어긋나지 않는다.
+  //
+  // 수입일 때 null 이 되는 것이 핵심이다 — 계좌를 움직이는 거래는 상환·납입·예치뿐이고
+  // 전부 지출이다. 수입을 계좌에 붙이면 잔액 계산이 부호를 안 봐서 **수입이 빚을 깎는다.**
+  // 서버도 422 로 막지만, 화면에서 아예 그 조합이 안 만들어지는 편이 낫다.
+  const linkedAccount = type === 'expense' ? (accounts.find(a => a.id === accountId) ?? null) : null;
   const isLoanLink = linkedAccount?.kind === 'loan';
   const interestValue = interestStr === '' ? 0 : Number(interestStr.replace(/[^0-9]/g, ''));
   // 금액을 아직 안 찍었으면 경고하지 않는다 — 계좌를 고르자마자 빨간 글씨가 뜨면
@@ -210,15 +214,18 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
 
         {/* 계좌 연결 — 이 거래가 대출 잔액이나 적금 잔액을 움직이게 한다.
             대부분의 거래는 계좌와 무관하므로 기본값은 "연결 안 함" 이다. */}
-        {accounts.length > 0 && (
+        {type === 'expense' && accounts.length > 0 && (
           <div className="flex flex-col gap-2">
             <span className="text-slate-400 text-xs font-bold px-1">계좌 연결 (선택)</span>
             <select value={accountId} onChange={(e) => {
               const next = e.target.value;
               setAccountId(next);
-              // 대출을 고르면 **이번 회차 예상 이자**를 미리 채운다. 확정은 사람이 한다.
               const picked = accounts.find(a => a.id === next);
+              // 대출을 고르면 **이번 회차 예상 이자**를 미리 채운다. 확정은 사람이 한다.
               setInterestStr(picked?.kind === 'loan' ? String(expectedRepayment(picked).interest) : '');
+              // 계좌에 정해둔 카테고리가 있으면 함께 고른다. 상환·납입은 늘 같은 분류라
+              // 매번 다시 고르게 할 이유가 없다. 정해두지 않았으면 건드리지 않는다.
+              if (picked?.category_id) setPickedCatId(picked.category_id);
             }}
               className="bg-slate-50 dark:bg-slate-900 rounded-2xl h-14 px-4 w-full border-none outline-none text-slate-700 dark:text-slate-200 font-medium text-sm appearance-none">
               <option value="">연결 안 함</option>
@@ -246,6 +253,11 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
             {linkedAccount && !isLoanLink && (
               <span className="text-[11px] text-slate-400 px-1">
                 {fmt(amountToSave)}원이 <strong>{linkedAccount.name}</strong> 잔액에 더해집니다.
+              </span>
+            )}
+            {linkedAccount?.category_name && (
+              <span className="text-[11px] text-slate-400 px-1">
+                카테고리를 <strong>{linkedAccount.category_name}</strong> 로 맞췄습니다 — 바꿔도 됩니다.
               </span>
             )}
           </div>

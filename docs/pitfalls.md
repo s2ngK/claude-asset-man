@@ -223,3 +223,12 @@ batch_op.create_unique_constraint(None, ['admin_code'])
 > autogenerate 는 `create_foreign_key(None, ...)` 처럼 이름 없는 제약을 낸다. SQLite 배치
 > 모드에서 무명 제약은 **나중에 떼어낼 수 없어** downgrade 가 막힌다. 이름을 붙여준다
 > (`fk_transactions_account_id`).
+
+## 인덱스는 마이그레이션이 아니라 **모델에** 선언한다
+
+`op.create_index()` 로만 만들고 모델에 `index=True` 를 안 적으면, autogenerate 가 그 다음부터
+**매번 그 인덱스를 지우자고 한다.** 모델에 없으니 없어야 할 것으로 보는 것이다.
+
+`accounts` 를 넣을 때 이걸 겪었다 — 다음 마이그레이션에서 `ix_accounts_group_id` 와
+`ix_transactions_account_id` 를 지우자는 제안이 함께 나왔다. 모델에 `index=True` 를 적자
+사라졌다.

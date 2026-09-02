@@ -353,3 +353,79 @@ def test_transaction_carries_the_account_name(client, auth_headers, category, lo
     row = client.get("/api/transactions", headers=auth_headers).json()[0]
     assert row["account_name"] == loan_account.name
     assert row["interest_amount"] == 100_000
+
+
+# ── 계좌의 기본 카테고리 ─────────────────────────────────────────────────────
+
+
+def test_account_carries_a_default_category(client, auth_headers, category):
+    """상환·납입 내역을 넣을 때마다 카테고리를 다시 고르지 않게 계좌에 정해둔다."""
+    body = _new(client, auth_headers, kind="loan", category_id=category.id).json()
+    assert body["category_id"] == category.id
+    assert body["category_name"] == category.name
+
+
+def test_account_category_is_optional(client, auth_headers):
+    body = _new(client, auth_headers).json()
+    assert body["category_id"] is None
+
+
+def test_account_rejects_an_income_category(client, auth_headers, income_category):
+    """계좌를 움직이는 거래는 언제나 지출이다. 수입 카테고리를 달면 저장할 수 없는 조합이 된다."""
+    res = _new(client, auth_headers, category_id=income_category.id)
+    assert res.status_code == 404
+
+
+def test_account_rejects_another_groups_category(client, auth_headers, other_group_category):
+    res = _new(client, auth_headers, category_id=other_group_category.id)
+    assert res.status_code == 404
+
+
+def test_account_category_can_be_changed(client, auth_headers, category, own_group_category, loan_account):
+    res = client.put(
+        f"/api/accounts/{loan_account.id}", json={"category_id": own_group_category.id}, headers=auth_headers
+    )
+    assert res.status_code == 200
+    assert res.json()["category_id"] == own_group_category.id
+
+
+def test_account_category_can_be_cleared(client, auth_headers, category):
+    account = _new(client, auth_headers, category_id=category.id).json()
+    res = client.put(f"/api/accounts/{account['id']}", json={"category_id": None}, headers=auth_headers)
+    assert res.json()["category_id"] is None
+
+
+# ── 수입은 계좌에 붙일 수 없다 ───────────────────────────────────────────────
+
+
+def test_income_cannot_be_linked_to_an_account(client, auth_headers, income_category, loan_account):
+    """잔액 계산이 부호를 보지 않는다 — 붙이면 **수입이 빚을 깎는다.**
+
+    500만원짜리 급여를 대출에 연결했더니 잔액이 1억에서 9,500만으로 줄었다.
+    """
+    res = client.post(
+        "/api/transactions",
+        json={
+            "category_id": income_category.id,
+            "type": "income",
+            "amount": 5_000_000,
+            "date": "2026-02-10",
+            "account_id": loan_account.id,
+        },
+        headers=auth_headers,
+    )
+    assert res.status_code == 422
+    assert client.get("/api/accounts", headers=auth_headers).json()[0]["balance"] == loan_account.amount
+
+
+def test_switching_a_linked_transaction_to_income_is_rejected(
+    client, auth_headers, category, income_category, loan_account
+):
+    """**저장 뒤의 상태**로 본다 — 종류만 바꿔도 앞뒤가 안 맞는다."""
+    tx = _spend(client, auth_headers, category, loan_account.id, 500_000, interest=100_000).json()
+    res = client.put(
+        f"/api/transactions/{tx['id']}",
+        json={"type": "income", "category_id": income_category.id},
+        headers=auth_headers,
+    )
+    assert res.status_code == 422

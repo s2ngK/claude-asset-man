@@ -92,7 +92,7 @@ class Transaction(Base):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     date: Mapped[str] = mapped_column(String, nullable=False)  # YYYY-MM-DD
     # 이 거래가 움직이는 계좌. NULL 이면 계좌와 무관한 보통의 거래다 (대부분이 그렇다).
-    account_id: Mapped[str | None] = mapped_column(String, ForeignKey("accounts.id"), nullable=True)
+    account_id: Mapped[str | None] = mapped_column(String, ForeignKey("accounts.id"), nullable=True, index=True)
     # amount 중 이자분. 나머지가 원금분이고, **잔액은 원금분만 움직인다.**
     # 50만원을 갚았고 그중 이자가 10만원이면 amount=500000, interest_amount=100000 이다 —
     # 거래를 원금/이자 두 줄로 쪼개지 않는다 (→ docs/accounts.md).
@@ -118,12 +118,15 @@ class Account(Base):
     __tablename__ = "accounts"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=gen_uuid)
-    group_id: Mapped[str] = mapped_column(String, ForeignKey("groups.id"), nullable=False)
+    group_id: Mapped[str] = mapped_column(String, ForeignKey("groups.id"), nullable=False, index=True)
     # 계좌 주인. 그룹이 아니라 구성원 한 명의 것이다.
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     # loan(대출) / deposit(예금) / installment(적금)
     kind: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
+    # 상환·납입 내역에 **기본으로 붙일 카테고리.** 지출 카테고리만 온다 — 계좌를 움직이는
+    # 거래는 언제나 지출이기 때문이다. 비어 있으면 화면이 카테고리를 건드리지 않는다.
+    category_id: Mapped[str | None] = mapped_column(String, ForeignKey("categories.id"), nullable=True)
     # **kind 가 이 값의 뜻을 정한다** — 대출: 대출 원금 · 예금: 예치액 · 적금: 월 납입액.
     # 셋으로 나누면 어느 행에서든 둘은 항상 비어 있다.
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -147,4 +150,7 @@ class Account(Base):
 
     group: Mapped[Group] = relationship("Group", back_populates="accounts")
     user: Mapped[User] = relationship("User", back_populates="accounts")
-    transactions: Mapped[list[Transaction]] = relationship("Transaction", back_populates="account")
+    category: Mapped[Category | None] = relationship("Category")
+    transactions: Mapped[list[Transaction]] = relationship(
+        "Transaction", back_populates="account", foreign_keys="Transaction.account_id"
+    )
