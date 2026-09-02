@@ -11,7 +11,7 @@ import {
   type Account, type AccountInput, type Category,
 } from '@/lib/api';
 import {
-  KIND_LABEL, REPAY_LABEL, STATUS_LABEL, expectedRepayment, isDebt, monthsLeft, progress,
+  KIND_LABEL, REPAY_LABEL, STATUS_LABEL, expectedRepayment, isDebt, monthsLeft, progress, settledSoFar,
 } from '@/lib/accounts';
 
 const won = (n: number) => new Intl.NumberFormat('ko-KR').format(n);
@@ -248,6 +248,7 @@ function Card({
             {' · '}연 {account.rate}%
             {account.repay_method && ` · ${REPAY_LABEL[account.repay_method]}`}
             {account.category_name && ` · ${account.category_icon ?? ''}${account.category_name}`}
+            {account.opening_on && ` · ${account.opening_on}부터 기록`}
           </p>
         </div>
         <div className="ml-auto text-right shrink-0">
@@ -268,12 +269,14 @@ function Card({
         </div>
         <div className="flex justify-between text-[11px] text-slate-400 mt-1.5 tabular-nums">
           {/* 예금은 "넣은 돈" 이 잔액과 같은 말이라 두 번 적을 이유가 없다. 대신 언제 넣었는지를 적는다. */}
+          {/* 앱을 쓰기 전에 갚은 몫까지 포함한 **전체**다. paid_principal 은 앱에 기록한
+              것만이라 이미 진행 중이던 계좌에서는 실제보다 작게 보인다. */}
           <span>
             {debt
-              ? `갚은 원금 ${won(account.paid_principal)}원`
+              ? `갚은 원금 ${won(settledSoFar(account))}원`
               : account.kind === 'deposit'
                 ? `${account.started_on} 예치`
-                : `넣은 돈 ${won(account.paid_principal)}원`}
+                : `넣은 돈 ${won(settledSoFar(account))}원`}
           </span>
           <span>{left > 0 ? `만기까지 ${left}개월` : '만기일 지남'}</span>
         </div>

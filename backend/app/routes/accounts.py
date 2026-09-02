@@ -24,7 +24,7 @@ INTEREST_CATEGORY_NAME = "금융수입"
 
 def _storable(data: dict) -> dict:
     """날짜 컬럼은 String 이라 date 객체를 그대로 넣을 수 없다 (거래와 같은 방식)."""
-    for field in ("started_on", "matures_on", "settled_on"):
+    for field in ("started_on", "matures_on", "settled_on", "opening_on"):
         if isinstance(data.get(field), date):
             data[field] = data[field].isoformat()
     return data
@@ -61,6 +61,23 @@ def _require_expense_category(db: Session, category_id: str, group_id: str) -> N
         raise HTTPException(status_code=404, detail="지출 카테고리를 찾을 수 없습니다.")
 
 
+def _check_opening(kind: str, opening_balance: int | None, opening_on: str | None, amount: int, started: str) -> None:
+    """개시 잔액은 **기준일과 함께**만 뜻이 있다.
+
+    잔액만 있고 기준일이 없으면 어느 시점의 값인지 알 수 없어 어느 거래부터 반영할지
+    정할 수 없다. 기준일만 있고 잔액이 없으면 아무 일도 안 하는 값이다.
+    """
+    if (opening_balance is None) != (opening_on is None):
+        raise HTTPException(status_code=422, detail="개시 잔액과 기준일은 함께 입력해야 합니다.")
+    if opening_on is None:
+        return
+    if opening_on < started:
+        raise HTTPException(status_code=422, detail="기준일이 계좌 시작일보다 빠를 수 없습니다.")
+    # 남은 원금이 빌린 돈보다 많을 수는 없다. 예적금에는 이런 상한이 없다.
+    if kind == "loan" and opening_balance is not None and opening_balance > amount:
+        raise HTTPException(status_code=422, detail="남은 원금이 대출 원금보다 클 수 없습니다.")
+
+
 def _normalize(kind: str, data: dict) -> dict:
     """대출이 아닌 계좌의 `repay_method` 를 지운다.
 
@@ -87,6 +104,8 @@ def serialize(account: models.Account, principal: int = 0, interest: int = 0) ->
         rate=account.rate,
         started_on=account.started_on,
         matures_on=account.matures_on,
+        opening_balance=account.opening_balance,
+        opening_on=account.opening_on,
         repay_method=account.repay_method,
         status=account.status,
         settled_on=account.settled_on,
@@ -133,6 +152,13 @@ def create_account(
         raise HTTPException(status_code=422, detail="만기일이 시작일보다 빠를 수 없습니다.")
     if payload.category_id:
         _require_expense_category(db, payload.category_id, current_user.group_id)
+    _check_opening(
+        payload.kind,
+        payload.opening_balance,
+        payload.opening_on.isoformat() if payload.opening_on else None,
+        payload.amount,
+        payload.started_on.isoformat(),
+    )
 
     account = models.Account(
         id=str(uuid.uuid4()),
@@ -165,6 +191,13 @@ def update_account(
     matures = changes.get("matures_on", account.matures_on)
     if matures < started:
         raise HTTPException(status_code=422, detail="만기일이 시작일보다 빠를 수 없습니다.")
+    _check_opening(
+        account.kind,
+        changes.get("opening_balance", account.opening_balance),
+        changes.get("opening_on", account.opening_on),
+        changes.get("amount", account.amount),
+        started,
+    )
 
     for field, value in changes.items():
         setattr(account, field, value)
@@ -243,7 +276,9 @@ def settle_account(
     settled_on = payload.settled_on.isoformat()
 
     if account.kind != "loan":
-        deposited = account.amount if account.kind == "deposit" else principal
+        # 넣은 원금 = 지금 잔액이다. 개시 잔액이 있으면 그것까지 포함된다 —
+        # 앱을 쓰기 전에 부은 돈을 빼먹으면 이자가 부풀려진다.
+        deposited = account_balance(account, principal)
         gain = payload.settled_amount - deposited
         if gain > 0:
             category = _interest_category(db, account.group_id, payload.interest_category_id)

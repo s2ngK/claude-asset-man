@@ -51,6 +51,12 @@ export default function AccountModal({
   const [maturesOn, setMaturesOn] = useState(initial?.matures_on ?? oneYearOut());
   const [repayMethod, setRepayMethod] = useState<RepayMethod>(initial?.repay_method ?? 'equal_payment');
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? '');
+  // 이미 진행 중인 계좌인가. 켜면 기준일과 그때의 잔액을 받는다.
+  const [inProgress, setInProgress] = useState(initial?.opening_balance != null);
+  const [openingOn, setOpeningOn] = useState(initial?.opening_on ?? new Date().toISOString().slice(0, 10));
+  const [openingBalance, setOpeningBalance] = useState(
+    initial?.opening_balance != null ? String(initial.opening_balance) : '',
+  );
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -59,8 +65,13 @@ export default function AccountModal({
   }, [onClose]);
 
   const amountValue = Number(amount.replace(/[^0-9]/g, '')) || 0;
+  const openingValue = Number(openingBalance.replace(/[^0-9]/g, '')) || 0;
   const datesOk = maturesOn >= startedOn;
-  const canSave = name.trim().length > 0 && amountValue > 0 && datesOk;
+  const openingDateOk = !inProgress || openingOn >= startedOn;
+  // 남은 원금이 빌린 돈보다 많을 수는 없다. 예적금에는 이런 상한이 없다.
+  const openingAmountOk = !inProgress || kind !== 'loan' || openingValue <= amountValue;
+  const canSave =
+    name.trim().length > 0 && amountValue > 0 && datesOk && openingDateOk && openingAmountOk;
 
   const submit = () => {
     if (!canSave) return;
@@ -72,6 +83,9 @@ export default function AccountModal({
       started_on: startedOn,
       matures_on: maturesOn,
       category_id: categoryId || null,
+      // 둘은 함께 간다 — 서버도 하나만 오면 422 다.
+      opening_balance: inProgress ? openingValue : null,
+      opening_on: inProgress ? openingOn : null,
       // 대출이 아니면 서버가 어차피 지운다. 여기서도 보내지 않아 뜻을 분명히 한다.
       repay_method: kind === 'loan' ? repayMethod : null,
     });
@@ -178,6 +192,55 @@ export default function AccountModal({
             </div>
           </div>
           {!datesOk && <p className="text-[11px] font-bold text-rose-500 px-1">만기일이 시작일보다 빠릅니다.</p>}
+
+          {/* 가계부를 쓰기 전에 이미 갚았거나 부은 것이 있는 계좌. 그 시점의 잔액에서
+              출발하고, 기준일 **뒤의** 내역만 잔액을 움직인다. */}
+          <div className="flex flex-col gap-2 rounded-2xl border border-slate-100 dark:border-slate-800 p-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={inProgress}
+                onChange={(e) => setInProgress(e.target.checked)}
+                className="size-4 accent-emerald-500" />
+              <span className="text-sm font-bold">이미 진행 중인 계좌입니다</span>
+            </label>
+
+            {!inProgress ? (
+              <span className="text-[11px] text-slate-400">
+                {kind === 'loan' ? '대출 원금 전액' : kind === 'installment' ? '0원' : '예치 금액'}에서 시작합니다.
+              </span>
+            ) : (
+              <>
+                <div className="flex gap-3 pt-1">
+                  <div className="flex-1 flex flex-col gap-2 min-w-0">
+                    <span className="text-slate-400 text-xs font-bold px-1">기준일</span>
+                    <DatePicker value={openingOn} onChange={setOpeningOn} />
+                  </div>
+                  <div className="flex-1 flex flex-col gap-2 min-w-0">
+                    <span className="text-slate-400 text-xs font-bold px-1">
+                      {kind === 'loan' ? '남은 원금' : kind === 'installment' ? '지금까지 넣은 돈' : '현재 잔액'}
+                    </span>
+                    <input value={openingBalance} inputMode="numeric"
+                      onChange={(e) => setOpeningBalance(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="0" className={cn(field, 'text-right')} />
+                  </div>
+                </div>
+                {openingValue > 0 && (
+                  <p className="text-[11px] text-slate-400 px-1 text-right">
+                    {new Intl.NumberFormat('ko-KR').format(openingValue)}원
+                  </p>
+                )}
+                {!openingDateOk && (
+                  <p className="text-[11px] font-bold text-rose-500 px-1">기준일이 시작일보다 빠릅니다.</p>
+                )}
+                {!openingAmountOk && (
+                  <p className="text-[11px] font-bold text-rose-500 px-1">남은 원금이 대출 원금보다 큽니다.</p>
+                )}
+                <span className="text-[11px] text-slate-400 px-1">
+                  <strong>기준일 뒤의 내역만</strong> 잔액을 움직입니다. 그 이전 내역을 나중에 넣어도
+                  두 번 반영되지 않습니다.
+                </span>
+              </>
+            )}
+          </div>
 
           {/* 상환·납입 내역을 넣을 때마다 카테고리를 다시 고르지 않게 여기서 한 번 정해둔다. */}
           <div className="flex flex-col gap-2">

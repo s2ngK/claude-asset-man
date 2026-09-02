@@ -135,6 +135,14 @@ class Account(Base):
     rate: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     started_on: Mapped[str] = mapped_column(String, nullable=False)  # YYYY-MM-DD
     matures_on: Mapped[str] = mapped_column(String, nullable=False)  # YYYY-MM-DD
+    # ── 이미 진행 중인 계좌를 등록할 때 ──────────────────────────────────────
+    # 가계부를 쓰기 전에 이미 갚았거나 부은 것이 있으면 그 시점의 잔액을 여기 적는다.
+    # 없으면 계좌를 처음부터 이 앱으로 관리한 것으로 본다.
+    #
+    # `opening_on` **뒤의 거래만** 잔액에 반영된다. 기준일 이전 내역을 나중에 채워 넣어도
+    # 이미 opening_balance 에 들어 있는 것을 두 번 빼지 않는다.
+    opening_balance: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    opening_on: Mapped[str | None] = mapped_column(String, nullable=True)  # YYYY-MM-DD
     # 대출만 채운다. equal_payment(원리금균등) / equal_principal(원금균등) / bullet(만기일시)
     repay_method: Mapped[str | None] = mapped_column(String, nullable=True)
     # active / matured(만기) / closed(중도해지·조기상환)

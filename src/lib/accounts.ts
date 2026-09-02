@@ -110,16 +110,27 @@ export function expectedRepayment(account: Account): { total: number; interest: 
   return { total: principal + interest, interest, principal };
 }
 
-/** 진행률 — 대출은 갚은 비율, 적금은 부은 비율. 예금은 시간이 지난 비율이다. */
+/**
+ * 진행률 — 대출은 갚은 비율, 적금은 부은 비율. 예금은 시간이 지난 비율이다.
+ *
+ * **`paid_principal` 이 아니라 `balance` 로 낸다.** 앱을 쓰기 전에 갚은 몫은
+ * `paid_principal` 에 없고 개시 잔액에 녹아 있다 — 그걸로 재면 이미 절반 갚은 대출이
+ * 0% 로 보인다 (→ docs/accounts.md).
+ */
 export function progress(account: Account): number {
   if (account.status !== 'active') return 1;
-  if (account.kind === 'loan') return clamp(account.paid_principal / account.amount);
+  if (account.kind === 'loan') return clamp((account.amount - account.balance) / account.amount);
   if (account.kind === 'installment') {
     const months = monthsBetween(account.started_on, account.matures_on);
-    return clamp(account.paid_principal / Math.max(account.amount * months, 1));
+    return clamp(account.balance / Math.max(account.amount * months, 1));
   }
   const term = monthsBetween(account.started_on, account.matures_on);
   return clamp((term - monthsLeft(account.matures_on)) / Math.max(term, 1));
+}
+
+/** 지금까지 갚은 원금 / 부은 돈. 앱을 쓰기 전의 몫까지 포함한 **전체**다. */
+export function settledSoFar(account: Account): number {
+  return account.kind === 'loan' ? account.amount - account.balance : account.balance;
 }
 
 const clamp = (value: number) => Math.min(Math.max(Number.isFinite(value) ? value : 0, 0), 1);

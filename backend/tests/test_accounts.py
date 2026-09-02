@@ -429,3 +429,125 @@ def test_switching_a_linked_transaction_to_income_is_rejected(
         headers=auth_headers,
     )
     assert res.status_code == 422
+
+
+# ── 이미 진행 중인 계좌 ──────────────────────────────────────────────────────
+
+
+def test_loan_starts_from_the_opening_balance(client, auth_headers):
+    """8년 갚은 대출을 넣어도 원금 전액이 남은 것으로 보이면 안 된다."""
+    body = _new(
+        client,
+        auth_headers,
+        kind="loan",
+        amount=120_000_000,
+        opening_balance=45_000_000,
+        opening_on="2026-08-31",
+    ).json()
+    assert body["balance"] == 45_000_000
+
+
+def test_installment_starts_from_the_opening_balance(client, auth_headers, category):
+    account = _new(
+        client,
+        auth_headers,
+        kind="installment",
+        amount=300_000,
+        opening_balance=3_600_000,
+        opening_on="2026-08-31",
+    ).json()
+    _spend(client, auth_headers, category, account["id"], 300_000, day="2026-09-01")
+
+    body = client.get("/api/accounts", headers=auth_headers).json()[0]
+    assert body["balance"] == 3_900_000
+
+
+def test_transactions_before_the_opening_date_are_ignored(client, auth_headers, category):
+    """기준일 시점의 잔액에 이미 들어 있는 것을 두 번 빼지 않는다."""
+    account = _new(
+        client,
+        auth_headers,
+        kind="loan",
+        amount=100_000_000,
+        opening_balance=40_000_000,
+        opening_on="2026-08-31",
+    ).json()
+    # 기준일 이전 — 반영되지 않아야 한다
+    _spend(client, auth_headers, category, account["id"], 5_000_000, day="2026-07-05")
+    # 기준일 당일 — 그 잔액에 이미 반영된 것으로 본다
+    _spend(client, auth_headers, category, account["id"], 5_000_000, day="2026-08-31")
+    # 기준일 이후 — 반영된다
+    _spend(client, auth_headers, category, account["id"], 1_000_000, day="2026-09-05")
+
+    body = client.get("/api/accounts", headers=auth_headers).json()[0]
+    assert body["paid_principal"] == 1_000_000
+    assert body["balance"] == 39_000_000
+
+
+def test_opening_balance_needs_a_date(client, auth_headers):
+    """잔액만 있으면 어느 거래부터 반영할지 정할 수 없다."""
+    assert _new(client, auth_headers, opening_balance=1_000).status_code == 422
+
+
+def test_opening_date_needs_a_balance(client, auth_headers):
+    assert _new(client, auth_headers, opening_on="2026-08-31").status_code == 422
+
+
+def test_opening_date_cannot_precede_the_start(client, auth_headers):
+    res = _new(client, auth_headers, opening_balance=1_000, opening_on="2025-01-01")
+    assert res.status_code == 422
+
+
+def test_loan_opening_cannot_exceed_the_principal(client, auth_headers):
+    """남은 원금이 빌린 돈보다 많을 수는 없다."""
+    res = _new(
+        client,
+        auth_headers,
+        kind="loan",
+        amount=10_000_000,
+        opening_balance=11_000_000,
+        opening_on="2026-08-31",
+    )
+    assert res.status_code == 422
+
+
+def test_savings_opening_may_exceed_the_monthly_amount(client, auth_headers):
+    """적금의 `amount` 는 월 납입액이라 상한이 아니다."""
+    res = _new(
+        client,
+        auth_headers,
+        kind="installment",
+        amount=300_000,
+        opening_balance=3_600_000,
+        opening_on="2026-08-31",
+    )
+    assert res.status_code == 201
+
+
+def test_opening_can_be_added_later(client, auth_headers, loan_account):
+    res = client.put(
+        f"/api/accounts/{loan_account.id}",
+        json={"opening_balance": 30_000_000, "opening_on": "2026-08-31"},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["balance"] == 30_000_000
+
+
+def test_settle_counts_money_paid_in_before_the_app(client, auth_headers, category, income_category):
+    """앱을 쓰기 전에 부은 돈을 빼먹으면 이자가 부풀려진다."""
+    account = _new(
+        client,
+        auth_headers,
+        kind="installment",
+        amount=300_000,
+        opening_balance=3_600_000,
+        opening_on="2026-08-31",
+    ).json()
+    _spend(client, auth_headers, category, account["id"], 300_000, day="2026-09-01")
+
+    # 넣은 돈 3,900,000 · 받은 돈 4,000,000 → 이자는 100,000 이다
+    _settle(client, auth_headers, account["id"], 4_000_000)
+
+    income = [r for r in client.get("/api/transactions", headers=auth_headers).json() if r["type"] == "income"]
+    assert [r["amount"] for r in income] == [100_000]

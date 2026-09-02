@@ -187,6 +187,9 @@ class AccountCreate(BaseModel):
     rate: float = Field(default=0.0, ge=0, le=100)
     started_on: date_type
     matures_on: date_type
+    # 이미 진행 중인 계좌를 등록할 때. **둘은 함께 온다** — 하나만 주면 422.
+    opening_balance: int | None = Field(default=None, ge=0)
+    opening_on: date_type | None = None
     # 대출이 아니면 무시된다 (라우트에서 None 으로 지운다).
     repay_method: RepayMethod | None = None
 
@@ -198,6 +201,8 @@ class AccountUpdate(BaseModel):
     rate: float | None = Field(default=None, ge=0, le=100)
     started_on: date_type | None = None
     matures_on: date_type | None = None
+    opening_balance: int | None = Field(default=None, ge=0)
+    opening_on: date_type | None = None
     repay_method: RepayMethod | None = None
 
 
@@ -229,6 +234,8 @@ class AccountResponse(BaseModel):
     rate: float
     started_on: str
     matures_on: str
+    opening_balance: int | None = None
+    opening_on: str | None = None
     repay_method: str | None = None
     status: str
     settled_on: str | None = None

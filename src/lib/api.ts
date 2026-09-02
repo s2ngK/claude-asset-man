@@ -227,6 +227,9 @@ export interface Account {
   rate: number;
   started_on: string;
   matures_on: string;
+  /** 이미 진행 중인 계좌를 등록했을 때, 기준일 시점의 잔액. 없으면 처음부터 관리한 것이다. */
+  opening_balance: number | null;
+  opening_on: string | null;
   repay_method: RepayMethod | null;
   status: AccountStatus;
   settled_on: string | null;
@@ -245,6 +248,8 @@ export interface AccountInput {
   rate: number;
   started_on: string;
   matures_on: string;
+  opening_balance?: number | null;
+  opening_on?: string | null;
   repay_method?: RepayMethod | null;
 }
 

@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Query, Session
 
 from . import models
@@ -72,6 +72,10 @@ def account_totals(db: Session, group_id: str) -> dict[str, tuple[int, int]]:
     계좌마다 따로 물으면 계좌 수만큼 쿼리가 나간다 — 추이에서 한 번 겪은 N+1 이다 (#15).
 
     `amount` 에서 `interest_amount` 를 뺀 것이 원금분이다. 이자는 잔액을 움직이지 않는다.
+
+    **개시 기준일(`opening_on`)이 있으면 그 뒤의 거래만 센다.** 기준일 시점의 잔액은 이미
+    `opening_balance` 에 들어 있어서, 그 이전 내역을 나중에 채워 넣어도 두 번 빠지지 않는다.
+    날짜가 `"YYYY-MM-DD"` 문자열이라 사전순 비교가 곧 날짜 비교다.
     """
     interest = func.coalesce(models.Transaction.interest_amount, 0)
     rows = (
@@ -80,9 +84,11 @@ def account_totals(db: Session, group_id: str) -> dict[str, tuple[int, int]]:
             func.sum(models.Transaction.amount - interest).label("principal"),
             func.sum(interest).label("interest"),
         )
+        .join(models.Account, models.Account.id == models.Transaction.account_id)
         .filter(
             models.Transaction.group_id == group_id,
             models.Transaction.account_id.isnot(None),
+            or_(models.Account.opening_on.is_(None), models.Transaction.date > models.Account.opening_on),
         )
         .group_by(models.Transaction.account_id)
         .all()
@@ -93,15 +99,20 @@ def account_totals(db: Session, group_id: str) -> dict[str, tuple[int, int]]:
 def account_balance(account: models.Account, principal: int) -> int:
     """계좌의 현재 잔액. 저장하지 않고 매번 계산한다.
 
+    **어디서 출발하느냐**만 `opening_balance` 가 정한다. 이미 진행 중인 계좌를 등록하면
+    그 값에서 시작하고, 없으면 계좌를 처음부터 이 앱으로 관리한 것으로 본다.
+
     끝난 계좌는 0 이다 — 만기에 받았거나 다 갚았으니 남은 것이 없다. 그때의 확정 금액은
     `settled_amount` 에 따로 남는다.
     """
     if account.status != "active":
         return 0
+    opening = account.opening_balance
     if account.kind == "loan":
-        return max(account.amount - principal, 0)
+        # 개시 잔액이 곧 그때 남아 있던 원금이다. 없으면 대출 원금 전액에서 출발한다.
+        return max((opening if opening is not None else account.amount) - principal, 0)
     if account.kind == "deposit":
-        # 목돈을 한 번 넣는다. 만기까지 예치액 그대로다.
-        return account.amount
+        # 목돈을 한 번 넣는다. 만기까지 그대로다 — 거래가 잔액을 움직이지 않는다.
+        return opening if opening is not None else account.amount
     # 적금 — 넣은 만큼이 잔액이다. account.amount 는 월 납입액이라 잔액이 아니다.
-    return principal
+    return (opening or 0) + principal

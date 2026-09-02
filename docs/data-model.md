@@ -60,6 +60,8 @@ erDiagram
         float rate "연이율 — 예상치 계산용"
         string started_on "YYYY-MM-DD"
         string matures_on "YYYY-MM-DD"
+        int opening_balance "이미 진행 중이면 그때 잔액"
+        string opening_on "그 잔액의 기준일"
         string repay_method "대출만"
         string status "active / matured / closed"
         int settled_amount "사람이 확정한 값"
