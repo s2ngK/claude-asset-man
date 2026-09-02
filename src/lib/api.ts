@@ -121,6 +121,11 @@ export interface Transaction {
   amount: number;
   description: string | null;
   date: string;
+  /** 이 거래가 움직이는 계좌. 대부분의 거래는 null 이다. */
+  account_id: string | null;
+  account_name: string | null;
+  /** amount 중 이자분. 나머지가 원금분이고 **잔액은 원금분만 움직인다.** */
+  interest_amount: number | null;
   created_at: string | null;
 }
 
@@ -131,12 +136,14 @@ export async function getTransactions(month?: string): Promise<Transaction[]> {
 
 export async function createTransaction(data: {
   category_id: string; type: string; amount: number; description?: string; date: string;
+  account_id?: string | null; interest_amount?: number | null;
 }): Promise<Transaction> {
   return request<Transaction>('/api/transactions', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function updateTransaction(id: string, data: Partial<{
   category_id: string; type: string; amount: number; description: string; date: string;
+  account_id: string | null; interest_amount: number | null;
 }>): Promise<Transaction> {
   return request<Transaction>(`/api/transactions/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
@@ -195,4 +202,84 @@ export async function getTrend(): Promise<TrendItem[]> {
 
 export async function getMemberStats(month: string): Promise<MemberStat[]> {
   return request<MemberStat[]>(`/api/stats/members?month=${month}`);
+}
+
+// ── Accounts ──────────────────────────────────────────────────────────────────
+
+/** 부채 하나(loan)와 자산 둘(deposit·installment). `amount` 의 뜻이 이 값에 달렸다. */
+export type AccountKind = 'loan' | 'deposit' | 'installment';
+export type AccountStatus = 'active' | 'matured' | 'closed';
+export type RepayMethod = 'equal_payment' | 'equal_principal' | 'bullet';
+
+export interface Account {
+  id: string;
+  group_id: string;
+  user_id: string;
+  user_display_name: string | null;
+  kind: AccountKind;
+  name: string;
+  /** 상환·납입 내역에 기본으로 붙일 **지출** 카테고리. 비어 있으면 화면이 안 건드린다. */
+  category_id: string | null;
+  category_name: string | null;
+  category_icon: string | null;
+  /** 대출: 대출 원금 · 예금: 예치액 · **적금: 월 납입액**(잔액이 아니다). */
+  amount: number;
+  rate: number;
+  started_on: string;
+  matures_on: string;
+  /** 이미 진행 중인 계좌를 등록했을 때, 기준일 시점의 잔액. 없으면 처음부터 관리한 것이다. */
+  opening_balance: number | null;
+  opening_on: string | null;
+  repay_method: RepayMethod | null;
+  status: AccountStatus;
+  settled_on: string | null;
+  settled_amount: number | null;
+  /** 아래 셋은 **서버가 계산해 실어주는 값**이다. 저장되지 않는다. */
+  balance: number;
+  paid_principal: number;
+  paid_interest: number;
+}
+
+export interface AccountInput {
+  kind: AccountKind;
+  name: string;
+  category_id?: string | null;
+  amount: number;
+  rate: number;
+  started_on: string;
+  matures_on: string;
+  opening_balance?: number | null;
+  opening_on?: string | null;
+  repay_method?: RepayMethod | null;
+}
+
+/** 그룹 전체의 계좌. 소유는 개인이지만 **열람은 그룹**이다. */
+export async function getAccounts(): Promise<Account[]> {
+  return request<Account[]>('/api/accounts');
+}
+
+export async function createAccount(data: AccountInput): Promise<Account> {
+  return request<Account>('/api/accounts', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateAccount(id: string, data: Partial<AccountInput>): Promise<Account> {
+  return request<Account>(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+/** 계좌를 지운다. 붙어 있던 **거래는 남고 연결만 끊긴다.** */
+export async function deleteAccount(id: string): Promise<void> {
+  return request<void>(`/api/accounts/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * 만기·중도해지를 확정한다. `settled_amount` 는 화면이 계산해 채워주지만
+ * **사람이 고친 값이 그대로 저장된다** (→ docs/accounts.md).
+ */
+export async function settleAccount(id: string, data: {
+  status: 'matured' | 'closed';
+  settled_on: string;
+  settled_amount: number;
+  interest_category_id?: string;
+}): Promise<Account> {
+  return request<Account>(`/api/accounts/${id}/settle`, { method: 'POST', body: JSON.stringify(data) });
 }

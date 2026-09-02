@@ -27,6 +27,11 @@ export interface Transaction {
   amount: number;
   description: string; // DB column is description, UI uses memo often, stick to DB
   date: string;
+  /** 이 거래가 움직이는 계좌. 대부분의 거래는 계좌와 무관하다 (→ docs/accounts.md). */
+  account_id?: string | null;
+  account_name?: string | null;
+  /** amount 중 이자분. 나머지가 원금분이고 **잔액은 원금분만 움직인다.** */
+  interest_amount?: number | null;
   image_url?: string;
   created_at?: string;
   

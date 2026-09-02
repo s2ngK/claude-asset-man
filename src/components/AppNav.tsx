@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 
 const ITEMS = [
   { href: '/', label: '홈', icon: 'home' },
+  { href: '/accounts', label: '자산', icon: 'account_balance' },
   { href: '/stats', label: '통계', icon: 'insights' },
   { href: '/settings', label: '설정', icon: 'settings' },
 ] as const;
@@ -31,7 +32,7 @@ export default function AppNav() {
     <>
       {/* 좁은 화면 — 하단 탭바 */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 pb-safe">
-        <div className="flex justify-around items-center h-16 max-w-md mx-auto px-6">
+        <div className="flex justify-around items-center h-16 max-w-md mx-auto px-3">
           {ITEMS.map(item => (
             <Link key={item.href} href={item.href}
               className={cn(

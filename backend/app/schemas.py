@@ -11,6 +11,15 @@ from pydantic import BaseModel, Field
 # 집계하기 때문에 그 거래는 목록에는 보이면서 합계에서는 조용히 빠진다.
 TransactionType = Literal["income", "expense"]
 
+# 계좌의 성격. 부채(loan) 하나와 자산(deposit·installment) 둘로 갈린다.
+# 예금은 목돈을 한 번 넣고, 적금은 매달 넣는다 — amount 가 뜻하는 것이 다르다.
+AccountKind = Literal["loan", "deposit", "installment"]
+# active(진행중) / matured(만기) / closed(중도해지·조기상환).
+# 끝난 계좌도 **행을 지우지 않는다** — 그룹 비활성화와 같은 방침이다.
+AccountStatus = Literal["active", "matured", "closed"]
+# 대출만 쓴다. 원리금균등 / 원금균등 / 만기일시.
+RepayMethod = Literal["equal_payment", "equal_principal", "bullet"]
+
 
 class LoginRequest(BaseModel):
     invite_code: str
@@ -88,6 +97,10 @@ class TransactionCreate(BaseModel):
     # 입력은 date 로 검증하고 저장은 "YYYY-MM-DD" 문자열로 한다 —
     # 월 필터가 date.startswith(month) 라서 형식이 어긋나면 어느 달에도 잡히지 않는다.
     date: date_type
+    # 이 거래가 움직이는 계좌. 대부분의 거래는 계좌와 무관하므로 선택 항목이다.
+    account_id: str | None = None
+    # amount 중 이자분. 나머지가 원금분이고 **잔액은 원금분만 움직인다.**
+    interest_amount: int | None = Field(default=None, ge=0)
 
 
 class TransactionUpdate(BaseModel):
@@ -96,6 +109,8 @@ class TransactionUpdate(BaseModel):
     amount: int | None = Field(default=None, gt=0)
     description: str | None = None
     date: date_type | None = None
+    account_id: str | None = None
+    interest_amount: int | None = Field(default=None, ge=0)
 
 
 class TransactionResponse(BaseModel):
@@ -111,6 +126,9 @@ class TransactionResponse(BaseModel):
     amount: int
     description: str | None = None
     date: str
+    account_id: str | None = None
+    account_name: str | None = None
+    interest_amount: int | None = None
     created_at: datetime | None = None
 
 
@@ -156,3 +174,76 @@ class UserCreate(BaseModel):
     group_id: str
     display_name: str
     invite_code: str | None = None
+
+
+class AccountCreate(BaseModel):
+    kind: AccountKind
+    name: str = Field(min_length=1, max_length=40)
+    # 상환·납입 내역에 기본으로 붙일 **지출** 카테고리. 안 주면 화면이 카테고리를 안 건드린다.
+    category_id: str | None = None
+    # kind 가 이 값의 뜻을 정한다 — 대출: 대출 원금 · 예금: 예치액 · 적금: 월 납입액.
+    amount: int = Field(gt=0)
+    # 연이율(%). 예상액을 계산해 보여주는 데만 쓴다.
+    rate: float = Field(default=0.0, ge=0, le=100)
+    started_on: date_type
+    matures_on: date_type
+    # 이미 진행 중인 계좌를 등록할 때. **둘은 함께 온다** — 하나만 주면 422.
+    opening_balance: int | None = Field(default=None, ge=0)
+    opening_on: date_type | None = None
+    # 대출이 아니면 무시된다 (라우트에서 None 으로 지운다).
+    repay_method: RepayMethod | None = None
+
+
+class AccountUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=40)
+    category_id: str | None = None
+    amount: int | None = Field(default=None, gt=0)
+    rate: float | None = Field(default=None, ge=0, le=100)
+    started_on: date_type | None = None
+    matures_on: date_type | None = None
+    opening_balance: int | None = Field(default=None, ge=0)
+    opening_on: date_type | None = None
+    repay_method: RepayMethod | None = None
+
+
+class AccountSettle(BaseModel):
+    """만기·해지 정산. **금액은 사람이 확정한다.**
+
+    계산기가 낸 예상액을 화면이 미리 채워주지만, 실제 수령액은 우대금리·중도해지이율·
+    세금우대 때문에 공식과 늘 어긋난다 → docs/accounts.md
+    """
+
+    status: Literal["matured", "closed"]
+    settled_on: date_type
+    settled_amount: int = Field(ge=0)
+    # 예적금 이자를 수입 거래로 남길 때 쓸 카테고리. 안 주면 서버가 고른다.
+    interest_category_id: str | None = None
+
+
+class AccountResponse(BaseModel):
+    id: str
+    group_id: str
+    user_id: str
+    user_display_name: str | None = None
+    kind: str
+    name: str
+    category_id: str | None = None
+    category_name: str | None = None
+    category_icon: str | None = None
+    amount: int
+    rate: float
+    started_on: str
+    matures_on: str
+    opening_balance: int | None = None
+    opening_on: str | None = None
+    repay_method: str | None = None
+    status: str
+    settled_on: str | None = None
+    settled_amount: int | None = None
+    # --- 아래는 전부 계산값이다. 저장되지 않는다 ---
+    # 대출: 남은 원금 · 예금: 예치액 · 적금: 누적 납입액. 끝난 계좌는 0.
+    balance: int
+    # 연결된 거래의 원금분 합계 (대출이면 갚은 원금, 적금이면 넣은 돈).
+    paid_principal: int
+    # 연결된 거래의 이자분 합계.
+    paid_interest: int

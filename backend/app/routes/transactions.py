@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from .. import models, schemas
 from ..database import get_db
 from ..dependencies import get_current_user
-from ..queries import visible_categories
+from ..queries import visible_accounts, visible_categories
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
@@ -61,6 +61,37 @@ def _require_usable_category(db: Session, category_id: str, group_id: str) -> No
         raise HTTPException(status_code=404, detail="카테고리를 찾을 수 없습니다.")
 
 
+def _require_usable_account(db: Session, account_id: str, group_id: str) -> None:
+    """계좌가 **이 그룹의 것**인지 확인한다. 아니면 404.
+
+    주인이 아니어도 된다 — 배우자의 대출을 대신 갚는 것은 공동 가계부에서 자연스럽다.
+    계좌를 고치는 것만 주인 몫이다 (→ routes/accounts.py).
+    """
+    if not visible_accounts(db, group_id).filter(models.Account.id == account_id).first():
+        raise HTTPException(status_code=404, detail="계좌를 찾을 수 없습니다.")
+
+
+def _check_account_fields(
+    db: Session, account_id: str | None, interest: int | None, amount: int, tx_type: str, group_id: str
+) -> None:
+    """계좌 연결과 이자분이 앞뒤가 맞는지 본다. **저장 뒤의 상태**를 기준으로 판단한다.
+
+    - **수입 거래는 계좌에 붙일 수 없다.** 잔액 계산이 부호를 보지 않아서, 붙이면 수입이
+      빚을 깎는다 (500만원 급여가 대출 잔액을 500만원 줄였다). 계좌를 움직이는 거래는
+      상환·납입·예치뿐이고 전부 지출이다. 받은 이자는 정산이 따로 만들고 계좌에 붙지 않는다
+    - 계좌 없이 이자분만 있으면 그 값은 아무 데도 안 쓰인다 (잔액은 계좌별로 낸다)
+    - 이자가 금액보다 크면 원금분이 음수가 되어 잔액이 거꾸로 늘어난다
+    """
+    if account_id is not None:
+        if tx_type != "expense":
+            raise HTTPException(status_code=422, detail="수입 내역은 계좌에 연결할 수 없습니다.")
+        _require_usable_account(db, account_id, group_id)
+    elif interest:
+        raise HTTPException(status_code=422, detail="계좌를 연결하지 않으면 이자분을 넣을 수 없습니다.")
+    if interest is not None and interest > amount:
+        raise HTTPException(status_code=422, detail="이자분이 금액보다 클 수 없습니다.")
+
+
 def _serialize(t: models.Transaction) -> schemas.TransactionResponse:
     return schemas.TransactionResponse(
         id=t.id,
@@ -75,6 +106,9 @@ def _serialize(t: models.Transaction) -> schemas.TransactionResponse:
         amount=t.amount,
         description=t.description,
         date=t.date,
+        account_id=t.account_id,
+        account_name=t.account.name if t.account else None,
+        interest_amount=t.interest_amount,
         created_at=t.created_at,
     )
 
@@ -82,7 +116,11 @@ def _serialize(t: models.Transaction) -> schemas.TransactionResponse:
 def _with_relations(db: Session, tx_id: str) -> models.Transaction:
     return (
         db.query(models.Transaction)
-        .options(joinedload(models.Transaction.category), joinedload(models.Transaction.user))
+        .options(
+            joinedload(models.Transaction.category),
+            joinedload(models.Transaction.user),
+            joinedload(models.Transaction.account),
+        )
         .filter(models.Transaction.id == tx_id)
         .one()
     )
@@ -96,7 +134,11 @@ def list_transactions(
 ):
     q = (
         db.query(models.Transaction)
-        .options(joinedload(models.Transaction.category), joinedload(models.Transaction.user))
+        .options(
+            joinedload(models.Transaction.category),
+            joinedload(models.Transaction.user),
+            joinedload(models.Transaction.account),
+        )
         .filter(models.Transaction.group_id == current_user.group_id)
     )
     if month:
@@ -111,6 +153,9 @@ def create_transaction(
     current_user: models.User = Depends(get_current_user),
 ):
     _require_usable_category(db, payload.category_id, current_user.group_id)
+    _check_account_fields(
+        db, payload.account_id, payload.interest_amount, payload.amount, payload.type, current_user.group_id
+    )
     tx = models.Transaction(
         id=str(uuid.uuid4()),
         group_id=current_user.group_id,
@@ -133,6 +178,14 @@ def update_transaction(
     changes = _storable(payload.model_dump(exclude_unset=True))
     if "category_id" in changes:
         _require_usable_category(db, changes["category_id"], current_user.group_id)
+    _check_account_fields(
+        db,
+        changes.get("account_id", tx.account_id),
+        changes.get("interest_amount", tx.interest_amount),
+        changes.get("amount", tx.amount),
+        changes.get("type", tx.type),
+        current_user.group_id,
+    )
     for field, value in changes.items():
         setattr(tx, field, value)
     db.commit()

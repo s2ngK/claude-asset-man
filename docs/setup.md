@@ -63,7 +63,7 @@ curl -X POST localhost:8000/api/admin/users \
 | `npm run lint` | 루트 | ESLint. **현재 0건 상태를 유지한다** |
 | `npx tsc --noEmit` | 루트 | 타입 체크 |
 | `npm run build` | 루트 | 프로덕션 빌드 (tsc 포함) |
-| `uv run pytest` | `backend/` | 테스트 138개 |
+| `uv run pytest` | `backend/` | 테스트 196개 |
 | `uv run ruff check .` | `backend/` | 파이썬 lint |
 | `uv run ruff format .` | `backend/` | 포맷 |
 | `uv run alembic revision --autogenerate -m "..."` | `backend/` | 모델 수정 후 **필수** |
@@ -133,7 +133,8 @@ cd backend && uv run pytest
 | `config.py` | 9 | 기본 시크릿 탐지, 프로덕션 기동 거부 |
 | `stats.py` | 24 | 그룹/개인 집계, 지출만 세기, 퍼센트·정렬, 추이 6개월 창, 날짜별 소계 |
 | `categories.py` | 22 | 목록·격리·정렬, 그룹 전용 추가/삭제, 색 자동 배정, 삭제 시 `기타` 이동, 관리자 권한 |
-| 합계 | **138** | |
+| `accounts.py` | 58 | 잔액 계산(대출·예금·적금), 소유·열람 경계, 정산과 이자 수입, 기본 카테고리, 수입 연결 차단, 개시 잔액 |
+| 합계 | **196** | |
 | 프론트엔드 | **0** | 의도적 보류 |
 
 # Docker

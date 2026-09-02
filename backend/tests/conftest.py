@@ -166,3 +166,72 @@ def mate_transaction(db_session, group_mate, category):
     db_session.add(tx)
     db_session.commit()
     return tx
+
+
+@pytest.fixture()
+def income_category(db_session):
+    """이자 수입이 담길 자리. `settle` 이 지정 없이도 이걸 찾아낸다."""
+    c = models.Category(id="income-finance", group_id=None, type="income", name="금융수입", is_default=True)
+    db_session.add(c)
+    db_session.commit()
+    return c
+
+
+@pytest.fixture()
+def loan_account(db_session, user):
+    a = models.Account(
+        id="loan-1",
+        group_id=user.group_id,
+        user_id=user.id,
+        kind="loan",
+        name="전세자금대출",
+        amount=100_000_000,
+        rate=3.5,
+        started_on="2026-01-01",
+        matures_on="2028-01-01",
+        repay_method="equal_payment",
+        status="active",
+    )
+    db_session.add(a)
+    db_session.commit()
+    return a
+
+
+@pytest.fixture()
+def mate_account(db_session, group_mate):
+    """같은 그룹 다른 구성원의 계좌 — 보이되 고칠 수는 없다."""
+    a = models.Account(
+        id="mate-savings",
+        group_id=group_mate.group_id,
+        user_id=group_mate.id,
+        kind="installment",
+        name="동료의 적금",
+        amount=300_000,
+        rate=4.0,
+        started_on="2026-01-01",
+        matures_on="2027-01-01",
+        status="active",
+    )
+    db_session.add(a)
+    db_session.commit()
+    return a
+
+
+@pytest.fixture()
+def other_group_account(db_session, other_group, other_group_user):
+    """다른 그룹의 계좌 — 어느 경로로도 닿으면 안 된다."""
+    a = models.Account(
+        id="other-group-account",
+        group_id=other_group.id,
+        user_id=other_group_user.id,
+        kind="deposit",
+        name="남의그룹예금",
+        amount=5_000_000,
+        rate=3.0,
+        started_on="2026-01-01",
+        matures_on="2027-01-01",
+        status="active",
+    )
+    db_session.add(a)
+    db_session.commit()
+    return a

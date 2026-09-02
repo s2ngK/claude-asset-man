@@ -199,6 +199,13 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ item, isMine, onDelet
               ) : (
                 <span>• {item.user_display_name || '알 수 없음'}</span>
               )}
+              {/* 계좌 연결도 **왼쪽 칸에만** 둔다. 오른쪽을 건드리면 줄마다 금액 끝이
+                  어긋난다 — 호버 삭제 버튼으로 한 번 겪은 일이다 (→ docs/pitfalls.md). */}
+              {item.account_name && (
+                <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-px text-[10px] font-bold text-slate-500 line-clamp-1">
+                  {item.account_name}
+                </span>
+              )}
             </p>
           </div>
         </div>

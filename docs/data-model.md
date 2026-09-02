@@ -2,15 +2,18 @@
 
 ← [그룹 가계부](README.md) · 관련 [아키텍처 개요](architecture.md) [인증과 그룹 격리](auth-and-scoping.md)
 
-테이블 4개가 전부다. `backend/app/models.py` 80줄이면 다 읽는다.
+테이블 5개가 전부다. `backend/app/models.py` 하나면 다 읽는다.
 
 ```mermaid
 erDiagram
     groups ||--o{ users : ""
     groups ||--o{ transactions : ""
     groups ||--o{ categories : "group_id NULL이면 시스템 기본"
+    groups ||--o{ accounts : ""
     users ||--o{ transactions : ""
+    users ||--o{ accounts : "소유는 개인, 열람은 그룹"
     categories ||--o{ transactions : ""
+    accounts ||--o{ transactions : "연결된 거래가 잔액을 만든다"
 
     groups {
         string id PK
@@ -39,10 +42,29 @@ erDiagram
         string group_id FK
         string user_id FK
         string category_id FK
+        string account_id FK "NULL이면 계좌와 무관"
         string type "income 또는 expense"
         int amount
+        int interest_amount "amount 중 이자분"
         string description
         string date "YYYY-MM-DD"
+    }
+    accounts {
+        string id PK
+        string group_id FK
+        string user_id FK "소유자"
+        string kind "loan / deposit / installment"
+        string name
+        string category_id FK "상환·납입 기본 카테고리(지출만)"
+        int amount "kind가 뜻을 정한다"
+        float rate "연이율 — 예상치 계산용"
+        string started_on "YYYY-MM-DD"
+        string matures_on "YYYY-MM-DD"
+        int opening_balance "이미 진행 중이면 그때 잔액"
+        string opening_on "그 잔액의 기준일"
+        string repay_method "대출만"
+        string status "active / matured / closed"
+        int settled_amount "사람이 확정한 값"
     }
 ```
 
@@ -88,6 +110,21 @@ erDiagram
 - `updated_at` — 수정 이력을 추적하지 않는다
 - 소프트 삭제 — DELETE는 실제 삭제다
 - `image_url` — `src/types/index.ts`에 필드가 남아 있지만 Supabase 시절 잔재고 DB에도 API에도 없다
+
+## `accounts` 에는 잔액 컬럼이 없다
+
+일부러 없다. 잔액은 연결된 거래에서 매번 계산한다 — 손으로 갱신하는 숫자는 몇 달 뒤에 안
+고치게 되고, 그러면 화면에 옛 잔액이 남는다 → [대출·예금·적금 계좌](accounts.md)
+
+`accounts.amount` **하나가 세 가지를 뜻한다** (대출: 원금 · 예금: 예치액 · 적금: 월 납입액).
+컬럼을 셋으로 나누면 어느 행에서든 둘은 항상 비어 있다.
+
+`transactions.account_id` 와 `interest_amount` 는 둘 다 nullable 이고 **대부분의 행에서 비어
+있다.** 계좌와 무관한 거래가 정상이기 때문이다 — 미래를 위한 빈 자리가 아니라 실제로 쓰이는
+sparse 컬럼이다.
+
+`accounts.category_id` 는 **지출 카테고리만** 가리킨다 (라우트에서 검증). 계좌를 움직이는
+거래는 언제나 지출이라서다 — `type == "income"` 인 거래는 계좌에 붙지 않는다.
 
 # 그룹은 지우지 않는다
 

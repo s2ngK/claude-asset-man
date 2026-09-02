@@ -55,15 +55,16 @@ Backend data persists in `backend/data/ledger.db` (SQLite file, bind-mounted).
 - `transactions.py` — CRUD for transactions, scoped to the caller's group; writes are restricted to the author
 - `categories.py` — list categories (system defaults + group-specific), plus create/delete of **group-specific** ones (group admin only). Deleting one moves its transactions to `기타` rather than deleting them
 - `stats.py` — monthly summary, category breakdown, **daily totals** (`/daily`, powers the calendar), member stats, 6-month trend
+- `accounts.py` — loans / deposits / installment savings. **There is no balance column** — balances are computed from linked transactions on every read (`queries.account_totals`). Accounts are owned by one member but readable by the whole group; `/settle` closes one out and books the interest as income. An account can carry a default **expense** category that the entry form auto-selects when you link it, and an `opening_balance`/`opening_on` pair for accounts that were already running before the app (only transactions **after** that date move the balance). **Income transactions cannot be linked to an account** — the balance sum is sign-blind, so income would pay down debt
 - `admin.py` — admin console API: `POST /admin/login`, groups (create/list/deactivate/restore/rotate admin code), members (create/list/rotate invite code), and **system categories** (`group_id IS NULL`, super admin only)
 
-**Shared backend modules:** `config.py` (env read through functions + `verify_startup_config()`, which refuses to boot in production with placeholder secrets), `dependencies.py` (`get_current_user`, `resolve_admin`), `queries.py` (`visible_categories`, fallback-category move), `palette.py` (the 8 validated categorical colors — the single source for category colors), `rate_limit.py`.
+**Shared backend modules:** `config.py` (env read through functions + `verify_startup_config()`, which refuses to boot in production with placeholder secrets), `dependencies.py` (`get_current_user`, `resolve_admin`), `queries.py` (`visible_categories`, `visible_accounts`, `account_totals`/`account_balance`, fallback-category move), `palette.py` (the 8 validated categorical colors — the single source for category colors), `rate_limit.py`.
 
 **Auth flow:** users submit an invite code → server looks up the matching user → returns a JWT. No email/password. JWT carries `user_id`, `group_id`, `display_name`.
 
 Admin access is a **separate scope on the same JWT secret**: `POST /api/admin/login` takes either `ADMIN_KEY` (→ `scope: admin`, super admin) or a group's `admin_code` (→ `scope: group_admin` + `group_id`/`group_name`, that group only). `get_current_user` rejects admin-scoped tokens, so admin tokens cannot reach user APIs. `/api/admin/*` also still accepts the raw `X-Admin-Key` header for curl/scripts. `POST /api/auth/login` and all `admin.py` routes are rate-limited (10/minute per IP via `slowapi`, see `app/rate_limit.py`) since the invite code / admin key are the only credentials. The key check happens inside each route body (not a `Depends`) so failed attempts still count toward rate limiting.
 
-**DB:** SQLAlchemy ORM models in `backend/app/models.py`. Tables: `groups → users → transactions + categories`. Categories with `group_id IS NULL` are system defaults seeded on startup (`backend/app/seed.py`). Groups are never deleted — `deactivated_at` soft-deactivates them, invalidating every credential in that group while keeping the records restorable.
+**DB:** SQLAlchemy ORM models in `backend/app/models.py`. Tables: `groups → users → transactions + categories + accounts`. Categories with `group_id IS NULL` are system defaults seeded on startup (`backend/app/seed.py`). Groups are never deleted — `deactivated_at` soft-deactivates them, invalidating every credential in that group while keeping the records restorable.
 
 ### Web App (`/`)
 
@@ -78,8 +79,9 @@ Storage is read through `useSyncExternalStore` (`lib/useLocalUser.ts`, `lib/useA
 - `TransactionItem` — one row; pointer-event swipe-to-delete (works with a mouse too), own-entry badge/tint
 - `AddEntryModal` — manual entry and edit form (no AI scanning); calculator keypad, backdrop/Esc dismiss
 - `StatsView` — donut (top 5 + `그 외`), 6-month trend, `MonthCalendar` for daily totals
+- `AccountsView` / `AccountModal` / `SettleModal` — loans and savings; balances come from the server, never stored → [docs/accounts.md](./docs/accounts.md)
 - `MonthPicker` / `DatePicker` — hand-built replacements for `<input type="month"|"date">`
-- `AppNav` — one navigation that changes shape: bottom tab bar below `lg`, left sidebar above
+- `AppNav` — one navigation that changes shape: bottom tab bar below `lg`, left sidebar above (홈 · 자산 · 통계 · 설정)
 - `SettingsView` — profile, group categories; lazy-loaded via `/settings`
 
 `/admin` is a separate console with its own login → [docs/admin-console.md](./docs/admin-console.md).
