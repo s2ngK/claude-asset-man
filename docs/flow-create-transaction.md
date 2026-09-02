@@ -69,6 +69,26 @@ sequenceDiagram
 
 좁은 화면에서는 모달이 화면을 다 덮어 "바깥" 이 없다. 그때는 [닫기] 가 유일한 길이다.
 
+## 날짜도 직접 만든 선택기를 쓴다
+
+`<input type="date">` 를 쓰지 않는다. 이유는 월 선택기와 같다 — 브라우저가 띄우는 달력은
+우리 CSS 가 닿지 않아 모달 안에서 혼자 다른 앱처럼 보인다
+(→ [목록 정렬과 필터](flow-list-sort-filter.md)의 "월 선택기는 직접 만든다").
+
+`src/components/DatePicker.tsx` 는 월 이동 + 날짜 격자 + `오늘` 이다.
+
+> [!WARNING] `Esc` 를 **캡처 단계에서 잡고 전파를 끊는다**
+> 이 선택기는 모달 **안에** 있고 모달도 `Esc` 로 닫힌다. 그냥 두면 `Esc` 한 번에 둘 다
+> 닫혀 **입력하던 내용이 통째로 날아간다.**
+>
+> ```ts
+> window.addEventListener('keydown', onKeyDown, true);  // ← capture
+> // onKeyDown: e.stopPropagation(); setOpen(false);
+> ```
+>
+> 겹쳐 뜨는 것을 새로 넣을 때마다 이 짝을 확인한다. "안쪽이 먼저 닫히고 거기서 멈춘다" 가
+> 사용자가 기대하는 동작이다.
+
 # 키패드
 
 계산기 배치를 따른다. 숫자는 전화기가 아니라 **계산기 순서**(아래로 갈수록 작아짐)로 놓고,

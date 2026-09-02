@@ -38,11 +38,15 @@ flowchart TD
 # 레이어 구성
 
 ## 백엔드 (`backend/app/`)
-- `main.py` — 앱 조립. 라우터 등록, CORS, rate limit 미들웨어, 시작 시 시딩
+- `main.py` — 앱 조립. 라우터 등록, CORS, rate limit 미들웨어, 시작 시 설정 검증 + 시딩
+- `config.py` — 환경변수를 **함수로** 읽는다(모듈 상수로 굳히면 테스트가 못 바꾼다) + `verify_startup_config()`
 - `database.py` — 엔진 + `SessionLocal` + `get_db` 의존성
 - `models.py` — SQLAlchemy ORM. [데이터 모델](data-model.md)
 - `schemas.py` — Pydantic 입출력 스키마
-- `dependencies.py` — 인증. [인증과 그룹 격리](auth-and-scoping.md)
+- `dependencies.py` — 사용자 인증(`get_current_user`)과 관리자 신원(`resolve_admin`). [인증과 그룹 격리](auth-and-scoping.md)
+- `queries.py` — 여러 라우트가 함께 쓰는 필터(`visible_categories`)와 `기타` 이동
+- `palette.py` — 검증기를 통과한 범주형 색 8개. 카테고리 색의 **유일한 출처**. [통계 집계 규칙](stats-rules.md)
+- `rate_limit.py` — slowapi limiter. [함정과 교훈](pitfalls.md)
 - `routes/` — `auth` `transactions` `categories` `stats` `admin`
 - `seed.py` — 시스템 기본 카테고리 10개
 
@@ -55,10 +59,16 @@ uv run alembic revision --autogenerate -m "..."
 ## 웹 (`src/`)
 - `proxy.ts` — 쿠키 기반 라우팅 가드 (구 `middleware.ts`)
 - `lib/api.ts` — **백엔드와 대화하는 유일한 통로.** 토큰 관리도 여기
-- `lib/constants.ts` — `DEFAULT_CATEGORIES`. [거래 등록 흐름](flow-create-transaction.md)에서 주의할 것
+- `lib/adminApi.ts` — `/admin` 화면 전용. 관리자 토큰은 `sessionStorage` 에 따로 둔다. [관리자 화면](admin-console.md)
+- `lib/constants.ts` — `DEFAULT_CATEGORIES` · `CHART_COLORS`(`palette.py` 와 같은 값) · 요일 표기
+- `lib/useLocalUser.ts`, `lib/useAdminToken.ts` — `useSyncExternalStore` 로 스토리지를 읽는다. 효과에서 `setState` 하지 않는 이유는 [함정과 교훈](pitfalls.md)
 - `types/index.ts` — UI가 쓰는 타입
-- `components/` — `MainView` `StatsView` `SettingsView` `AddEntryModal` `TransactionItem` `UndoToast`
-- `app/` — App Router. `/` `/login` `/stats` `/settings`
+- `components/` — 목록 `MainView` `TransactionItem` `UndoToast` · 입력 `AddEntryModal` `DatePicker` ·
+  통계 `StatsView` `MonthCalendar` · 공통 `AppNav` `MonthPicker` · 설정 `SettingsView`
+- `app/` — App Router. `/` `/login` `/stats` `/settings` `/admin`
+
+`/admin` 은 나머지와 **인증 체계가 다르다.** 초대 코드가 아니라 관리자 키로 로그인하고,
+토큰도 `sessionStorage` 에 따로 산다 → [관리자 화면](admin-console.md)
 
 화면은 전부 클라이언트 컴포넌트다. 서버 컴포넌트에서 데이터를 가져오지 않는다 — 토큰이 `localStorage`에 있기 때문이다.
 

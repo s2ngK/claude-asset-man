@@ -3,8 +3,8 @@
 초대 코드로 로그인하는 가족·모임용 가계부. 개인 서버에 올려 쓰는 것을 전제로 만들었다.
 
 - 저장소: https://github.com/s2ngK/claude-asset-man (public)
-- 기준: `main` · b13e6ab · 2026-08-27
-- 프로덕션 코드 2,488줄 (백엔드 + 웹)
+- 기준: `main` · e59c5b8 · 2026-09-01
+- 프로덕션 코드 4,656줄 (백엔드 1,585 · 웹 3,071 — shadcn `components/ui` 제외)
 
 ## 스택
 - 웹: Next.js 16 · React 19 · Tailwind v4 · shadcn 계열 · PWA
@@ -36,7 +36,7 @@
 - [함정과 교훈](pitfalls.md) — 이미 한 번씩 당한 것들
 
 ## 현황
-- [결함 목록](known-issues.md) — 리뷰에서 확인된 13건. **상태는 GitHub 이슈에서 읽어오므로 손으로 고칠 필요가 없다**
+- [결함 목록](known-issues.md) — 2026-08 리뷰에서 나온 13건. **전부 종료됐다.** 상태는 GitHub 이슈에서 읽어오므로 손으로 고칠 필요가 없다
 
 # 이 프로젝트의 원칙
 
@@ -70,7 +70,11 @@
 > | `dependencies.py`, 인증·그룹 필터 | [인증과 그룹 격리](auth-and-scoping.md) |
 > | `routes/` 의 동작·에러 응답 | [엔드포인트별 규칙](api-rules.md) |
 > | `routes/stats.py`, 집계 방식 | [통계 집계 규칙](stats-rules.md) |
+> | `routes/admin.py`, 관리자 권한 | [관리자 화면](admin-console.md) |
+> | `routes/categories.py`, `palette.py` | [통계 집계 규칙](stats-rules.md), [거래 등록 흐름](flow-create-transaction.md) |
 > | 거래 등록·삭제 UI 로직 | [거래 등록 흐름](flow-create-transaction.md), [삭제와 되돌리기](flow-delete-undo.md) |
+> | 목록 정렬·필터, 월 선택기 | [목록 정렬과 필터](flow-list-sort-filter.md) |
+> | 내비게이션·화면 폭 분기 | [반응형 레이아웃](responsive-layout.md) |
 > | 빌드·실행 명령, 환경변수 | [개발 환경 세팅](setup.md) |
 
 ## 옵시디언에서 보기

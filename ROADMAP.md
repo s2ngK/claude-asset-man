@@ -6,22 +6,17 @@
 
 ## 진행 중
 
-- [ ] 코드 리뷰에서 나온 결함 13건 해결 — [#5 ~ #17](https://github.com/s2ngK/claude-asset-man/issues?q=is%3Aissue+is%3Aopen+label%3A%22코드리뷰+2026-08%22)
-  - 권장 순서: #6(입력 검증) → #5(그룹 소유권) → #7(삭제 타이머) → #8+#9(Docker 배포) → #12+#10(fail-fast) → #11(401 처리)
+**없음.** PR #51 머지로 열려 있던 작업이 전부 닫혔다. 다음 것은 아래 백로그에서 고른다.
 
-- [ ] [#43](https://github.com/s2ngK/claude-asset-man/issues/43) 캘린더형 일별 수입·지출 소계 (`feat/43-daily-calendar`)
-
+미해결 이슈는 [#44](https://github.com/s2ngK/claude-asset-man/issues/44) 하나뿐이고, 그건
+요구사항 정의부터 다시 써야 해서 착수 전이다.
 
 ## 다음 작업 (백로그)
 
-- [x] 유출됐던 Supabase Personal Access Token 재발급/폐기 확인 (git 히스토리에선 제거 완료, 토큰 자체 회전 필요) - 별도 작업으로 프로젝트 자체 폐기
-- [x] `update-claude-md`, `change-claude` 스테일 브랜치 정리 여부 결정 (둘 다 main에 완전히 흡수된 상태) - 브랜치 정리
 - [ ] [#44](https://github.com/s2ngK/claude-asset-man/issues/44) 대출·예적금 탭 — **요구사항 정의서를 다시 쓰기로 했다.** 무엇을 관리할지(상환 일정까지 vs 잔액만) 정해야 테이블이 나온다
 - [ ] 프론트엔드 화면 수가 늘어나면 서버 상태관리 라이브러리(react-query 등) 도입 검토
 
 ## 다음에 볼 만한 것
-
-- [x] 아키텍처·동작 문서를 `docs/`에 작성하고 저장소 안으로 편입 — 코드와 같은 PR에서 갱신되도록. 옵시디언 볼트로도 열린다
 
 - [ ] next-pwa가 webpack 설정을 주입해 Turbopack을 못 씀 (`dev`/`build` 모두 `--webpack` 고정 중). Turbopack 전환하려면 PWA 플러그인 대안 검토 필요
 
@@ -33,6 +28,10 @@
 
 ## 완료
 
+- [x] [#43](https://github.com/s2ngK/claude-asset-man/issues/43) 통계 화면 — 날짜별 달력, 직접 만든 날짜·월 선택기, 도넛 상위 5개 (PR #51). 도넛 조각 색은 저장된 카테고리 색이 아니라 **순위 순서**로 준다 — 카테고리가 팔레트(8색)보다 많아져 상위 5개 안에서 색이 겹쳤다
+- [x] 아키텍처·동작 문서를 `docs/`에 작성하고 저장소 안으로 편입 — 코드와 같은 PR에서 갱신되도록. 옵시디언 볼트로도 열린다
+- [x] 유출됐던 Supabase Personal Access Token 재발급/폐기 확인 (git 히스토리에선 제거 완료) — 별도 작업으로 프로젝트 자체 폐기
+- [x] `update-claude-md`, `change-claude` 스테일 브랜치 정리 (둘 다 main에 완전히 흡수된 상태)
 - [x] [#41](https://github.com/s2ngK/claude-asset-man/issues/41) 카테고리 관리 — 그룹 전용은 그룹 관리자, 공통은 전체 관리자 (PR #46)
 - [x] [#42](https://github.com/s2ngK/claude-asset-man/issues/42) 데스크톱 반응형 (PR #47)
 - [x] 입력/수정 모달을 바깥 클릭·Esc 로 닫기 (PR #48). 호버 삭제는 금액 정렬을 깨뜨려 물렀다
