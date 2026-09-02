@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import AddEntryModal from '@/components/AddEntryModal';
+import AddEntryModal, { type EntryDraft } from '@/components/AddEntryModal';
 import AppNav, { SIDEBAR_WIDTH } from '@/components/AppNav';
 import MonthPicker from '@/components/MonthPicker';
 import TransactionItem from '@/components/TransactionItem';
@@ -12,10 +12,11 @@ import { Transaction, TransactionType } from '@/types';
 import { cn, getErrorMessage } from '@/lib/utils';
 import {
   getTransactions, createTransaction, updateTransaction, deleteTransaction,
-  getCategories, getSummary,
+  getCategories, getSummary, getAccounts,
   type Transaction as ApiTransaction,
   type Category as ApiCategory,
   type MonthlySummary,
+  type Account,
 } from '@/lib/api';
 import { useLocalUser } from '@/lib/useLocalUser';
 
@@ -34,6 +35,9 @@ function toLocalTx(t: ApiTransaction): Transaction {
     description: t.description ?? '',
     date: t.date,
     created_at: t.created_at ?? '',
+    account_id: t.account_id,
+    account_name: t.account_name,
+    interest_amount: t.interest_amount,
     user_display_name: t.user_display_name ?? undefined,
     categories: t.category_name ? { id: t.category_id, name: t.category_name, icon: t.category_icon ?? '', color: t.category_color ?? '' } : null,
   };
@@ -49,6 +53,8 @@ export default function MainView() {
   // 수정 대상. null 이면 추가 모드다 — 같은 모달을 쓰고 이 값으로 갈린다.
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [categories, setCategories] = useState<ApiCategory[]>([]);
+  // 내역에 연결할 수 있는 계좌 — **진행 중인 것만.** 끝난 계좌에 새 상환을 붙일 일은 없다.
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all'); // category_id 또는 'all'
@@ -79,25 +85,45 @@ export default function MainView() {
     }
   }, [currentMonth]);
 
+  /** 잔액은 거래에서 계산되므로, 거래를 건드릴 때마다 계좌도 다시 받는다. */
+  const refreshAccounts = useCallback(async () => {
+    try {
+      // 끝난 계좌에는 새 상환·납입을 붙일 일이 없다.
+      setAccounts((await getAccounts()).filter(a => a.status === 'active'));
+    } catch (err) {
+      console.error('account fetch error', err);
+    }
+  }, []);
+
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
+  useEffect(() => { refreshAccounts(); }, [refreshAccounts]);
 
   // 필터 드롭다운과 저장 시 이름→id 매칭에 함께 쓴다. 한 번만 받아둔다.
   useEffect(() => {
     getCategories().then(setCategories).catch(err => console.error('category fetch error', err));
   }, []);
 
-  const handleSaveEntry = async (amount: number, categoryId: string, desc: string, type: TransactionType, date: string) => {
+  const handleSaveEntry = async (draft: EntryDraft) => {
     try {
       // 모달이 서버 카테고리 id 를 그대로 준다 — 이름으로 되찾을 일이 없다 (#17).
-      const payload = { category_id: categoryId, type, amount, description: desc, date };
+      const payload = {
+        category_id: draft.categoryId,
+        type: draft.type,
+        amount: draft.amount,
+        description: draft.description,
+        date: draft.date,
+        account_id: draft.accountId,
+        interest_amount: draft.interestAmount,
+      };
       // editing 은 모달이 닫히기 전에 읽힌다 (onSave → onClose 순서).
       if (editing) {
         await updateTransaction(editing.id, payload);
       } else {
         await createTransaction(payload);
       }
-      await Promise.all([fetchTransactions(), fetchSummary()]);
+      // 계좌 잔액도 이 거래에서 계산되므로 함께 다시 받는다.
+      await Promise.all([fetchTransactions(), fetchSummary(), refreshAccounts()]);
     } catch (err) {
       alert('저장 실패: ' + getErrorMessage(err, '알 수 없는 오류'));
     }
@@ -147,6 +173,9 @@ export default function MainView() {
         amount: item.amount,
         description: item.description,
         date: item.date,
+        // 계좌 연결까지 되살린다. 빠뜨리면 되돌린 뒤 잔액만 조용히 어긋난다.
+        account_id: item.account_id ?? null,
+        interest_amount: item.interest_amount ?? null,
       });
     } catch (err) {
       alert('되돌리기 실패: ' + getErrorMessage(err, '알 수 없는 오류'));
@@ -362,12 +391,15 @@ export default function MainView() {
           onClose={() => { setIsAddEntryOpen(false); setEditing(null); }}
           onSave={handleSaveEntry}
           categories={categories}
+          accounts={accounts}
           initial={editing ? {
             amount: editing.amount,
             categoryId: editing.category_id,
             description: editing.description,
             type: editing.type,
             date: editing.date,
+            accountId: editing.account_id ?? null,
+            interestAmount: editing.interest_amount ?? null,
           } : undefined}
         />
       )}

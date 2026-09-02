@@ -4,17 +4,33 @@ import React, { useEffect, useState } from 'react';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { TransactionType } from '@/types';
 import { cn } from '@/lib/utils';
-import type { Category as ApiCategory } from '@/lib/api';
+import type { Account, Category as ApiCategory } from '@/lib/api';
 import { Button } from './ui/button';
 import DatePicker from '@/components/DatePicker';
+import { KIND_LABEL, expectedRepayment } from '@/lib/accounts';
+
+/** 모달이 모아 돌려주는 값. 항목이 일곱 개가 되면서 위치 인자로는 읽을 수 없게 됐다. */
+export interface EntryDraft {
+  amount: number;
+  categoryId: string;
+  description: string;
+  type: TransactionType;
+  date: string;
+  /** 고르지 않았으면 null 이다. 서버는 이 값으로 잔액을 움직인다. */
+  accountId: string | null;
+  /** 대출 상환일 때만 의미가 있다. 계좌를 안 골랐으면 null. */
+  interestAmount: number | null;
+}
 
 interface AddEntryModalProps {
   onClose: () => void;
   /** 카테고리는 **id 로** 넘긴다. 이름으로 넘기면 서버에서 다시 찾아야 하고, `기타` 처럼
    *  수입·지출 양쪽에 있는 이름은 엉뚱한 것을 집을 수 있다 (#17). */
-  onSave: (amount: number, categoryId: string, description: string, type: TransactionType, date: string) => void;
+  onSave: (draft: EntryDraft) => void;
   /** 서버 카테고리 목록. **id 의 유일한 출처다.** 아직 못 받았으면 저장을 막는다. */
   categories: ApiCategory[];
+  /** 연결할 수 있는 계좌 — 진행 중인 것만. 없으면 계좌 칸 자체가 안 보인다. */
+  accounts?: Account[];
   /**
    * 있으면 **수정 모드**다. 폼을 이 값으로 채우고 문구만 바꾼다.
    * 만들기냐 고치기냐의 판단은 `MainView` 가 한다 — 이 컴포넌트는 값만 모아 돌려준다.
@@ -25,16 +41,23 @@ interface AddEntryModalProps {
     description: string;
     type: TransactionType;
     date: string;
+    accountId?: string | null;
+    interestAmount?: number | null;
   };
 }
 
-const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categories, initial }) => {
+const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categories, accounts = [], initial }) => {
   const isEditing = initial !== undefined;
   const [type, setType] = useState<TransactionType>(initial?.type ?? 'expense');
   const [amountStr, setAmountStr] = useState(initial ? String(initial.amount) : '0');
   const [pickedCatId, setPickedCatId] = useState(initial?.categoryId ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().split('T')[0]);
+  const [accountId, setAccountId] = useState(initial?.accountId ?? '');
+  // 빈 문자열이면 "안 넣음" 이다. 0 과 구분해야 이자 없는 상환을 표현할 수 있다.
+  const [interestStr, setInterestStr] = useState(
+    initial?.interestAmount != null ? String(initial.interestAmount) : '',
+  );
   // +/- 를 누르면 지금까지의 값이 여기로 확정되고, 키패드는 다음 피연산자를 받는다.
   const [pending, setPending] = useState<{ value: number; op: '+' | '-' } | null>(null);
 
@@ -84,6 +107,15 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
 
   const canSave = amountToSave > 0 && categoriesReady && selectedCatId !== '';
 
+  // 고른 계좌는 **읽을 때 파생시킨다.** 목록이 바뀌어 사라진 id 가 남아 있어도
+  // 화면과 state 가 어긋나지 않는다 (카테고리 선택과 같은 방식).
+  const linkedAccount = accounts.find(a => a.id === accountId) ?? null;
+  const isLoanLink = linkedAccount?.kind === 'loan';
+  const interestValue = interestStr === '' ? 0 : Number(interestStr.replace(/[^0-9]/g, ''));
+  // 금액을 아직 안 찍었으면 경고하지 않는다 — 계좌를 고르자마자 빨간 글씨가 뜨면
+  // 사용자가 뭔가 잘못한 것처럼 읽힌다. 그 상태에서는 어차피 [완료] 가 잠겨 있다.
+  const interestTooBig = isLoanLink && amountToSave > 0 && interestValue > amountToSave;
+
   // Esc 로도 닫는다. 바깥을 눌러 닫는 다이얼로그에서 키보드만 안 먹으면 앞뒤가 안 맞는다.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -92,8 +124,17 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
   }, [onClose]);
 
   const handleDone = () => {
-    if (!canSave) return; // 금액은 서버 스키마가 > 0 을 요구하고, 카테고리는 id 가 있어야 한다
-    onSave(amountToSave, selectedCatId, description, type, date);
+    if (!canSave || interestTooBig) return; // 금액은 서버 스키마가 > 0 을 요구하고, 카테고리는 id 가 있어야 한다
+    onSave({
+      amount: amountToSave,
+      categoryId: selectedCatId,
+      description,
+      type,
+      date,
+      accountId: linkedAccount ? linkedAccount.id : null,
+      // 계좌를 안 골랐으면 이자분도 없다 — 서버가 그 조합을 422 로 막는다.
+      interestAmount: linkedAccount && isLoanLink ? interestValue : null,
+    });
     onClose();
   };
 
@@ -166,6 +207,49 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
             </select>
           </div>
         </div>
+
+        {/* 계좌 연결 — 이 거래가 대출 잔액이나 적금 잔액을 움직이게 한다.
+            대부분의 거래는 계좌와 무관하므로 기본값은 "연결 안 함" 이다. */}
+        {accounts.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="text-slate-400 text-xs font-bold px-1">계좌 연결 (선택)</span>
+            <select value={accountId} onChange={(e) => {
+              const next = e.target.value;
+              setAccountId(next);
+              // 대출을 고르면 **이번 회차 예상 이자**를 미리 채운다. 확정은 사람이 한다.
+              const picked = accounts.find(a => a.id === next);
+              setInterestStr(picked?.kind === 'loan' ? String(expectedRepayment(picked).interest) : '');
+            }}
+              className="bg-slate-50 dark:bg-slate-900 rounded-2xl h-14 px-4 w-full border-none outline-none text-slate-700 dark:text-slate-200 font-medium text-sm appearance-none">
+              <option value="">연결 안 함</option>
+              {accounts.map(a => (
+                <option key={a.id} value={a.id}>{KIND_LABEL[a.kind]} · {a.name}</option>
+              ))}
+            </select>
+
+            {isLoanLink && (
+              <div className="flex flex-col gap-1.5 pt-1">
+                <span className="text-slate-400 text-xs font-bold px-1">그중 이자</span>
+                <input value={interestStr} inputMode="numeric"
+                  onChange={(e) => setInterestStr(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="0"
+                  className="w-full bg-slate-50 dark:bg-slate-900 rounded-2xl h-12 px-4 text-sm font-medium text-right outline-none border border-transparent focus:border-emerald-500" />
+                <span className={cn('text-[11px] px-1', interestTooBig ? 'font-bold text-rose-500' : 'text-slate-400')}>
+                  {interestTooBig
+                    ? '이자가 금액보다 클 수 없습니다.'
+                    : amountToSave === 0
+                      ? '이번 회차 예상 이자입니다 — 실제 낸 금액으로 고쳐 주세요'
+                      : `원금 ${fmt(Math.max(amountToSave - interestValue, 0))}원만큼 잔액이 줄어듭니다`}
+                </span>
+              </div>
+            )}
+            {linkedAccount && !isLoanLink && (
+              <span className="text-[11px] text-slate-400 px-1">
+                {fmt(amountToSave)}원이 <strong>{linkedAccount.name}</strong> 잔액에 더해집니다.
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="mt-auto bg-indigo-50/50 dark:bg-slate-900/50 p-4 border-t border-indigo-100 dark:border-slate-800">
@@ -174,7 +258,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({ onClose, onSave, categori
               숫자는 전화기가 아니라 계산기 순서(아래로 갈수록 작아짐)를 따른다. */}
           {['7','8','9','back','4','5','6','+','1','2','3','-','0','00','C','완료'].map(label => (
             <KeypadButton key={label} label={label} onClick={handleKeyPress} onDone={handleDone}
-              disabled={label === '완료' && !canSave}
+              disabled={label === '완료' && (!canSave || interestTooBig)}
               variant={label === '완료' ? 'primary' : ['C','back','+','-'].includes(label) ? 'action' : 'number'} />
           ))}
         </div>

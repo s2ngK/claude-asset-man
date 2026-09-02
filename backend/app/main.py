@@ -8,7 +8,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from . import config
 from .rate_limit import limiter
-from .routes import admin, auth, categories, stats, transactions
+from .routes import accounts, admin, auth, categories, stats, transactions
 from .seed import seed_initial_data
 
 
@@ -41,6 +41,7 @@ app.include_router(auth.router)
 app.include_router(transactions.router)
 app.include_router(categories.router)
 app.include_router(stats.router)
+app.include_router(accounts.router)
 app.include_router(admin.router)
 
 

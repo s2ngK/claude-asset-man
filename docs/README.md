@@ -3,7 +3,7 @@
 초대 코드로 로그인하는 가족·모임용 가계부. 개인 서버에 올려 쓰는 것을 전제로 만들었다.
 
 - 저장소: https://github.com/s2ngK/claude-asset-man (public)
-- 기준: `main` · e59c5b8 · 2026-09-01
+- 기준: `main` · 0c2954d · 2026-09-02
 - 프로덕션 코드 4,656줄 (백엔드 1,585 · 웹 3,071 — shadcn `components/ui` 제외)
 
 ## 스택
@@ -28,6 +28,7 @@
 - [목록 정렬과 필터](flow-list-sort-filter.md) — 전부 클라이언트에서. `created_at` 이 2차 정렬 키인 이유
 - [삭제와 되돌리기](flow-delete-undo.md) — 즉시 삭제 + 재생성 방식 되돌리기
 - [통계 집계 규칙](stats-rules.md) — 무엇이 집계에 잡히고 무엇이 빠지는가
+- [대출·예금·적금 계좌](accounts.md) — **잔액 컬럼이 없는** 이유, 소유는 개인 열람은 그룹
 
 ## 운영
 - [개발 환경 세팅](setup.md) — 클론부터 로그인까지
@@ -72,6 +73,7 @@
 > | `routes/stats.py`, 집계 방식 | [통계 집계 규칙](stats-rules.md) |
 > | `routes/admin.py`, 관리자 권한 | [관리자 화면](admin-console.md) |
 > | `routes/categories.py`, `palette.py` | [통계 집계 규칙](stats-rules.md), [거래 등록 흐름](flow-create-transaction.md) |
+> | `routes/accounts.py`, 잔액 계산 | [대출·예금·적금 계좌](accounts.md) |
 > | 거래 등록·삭제 UI 로직 | [거래 등록 흐름](flow-create-transaction.md), [삭제와 되돌리기](flow-delete-undo.md) |
 > | 목록 정렬·필터, 월 선택기 | [목록 정렬과 필터](flow-list-sort-filter.md) |
 > | 내비게이션·화면 폭 분기 | [반응형 레이아웃](responsive-layout.md) |

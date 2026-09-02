@@ -203,3 +203,23 @@ echo back** 했다. `JWT_SECRET`·`ADMIN_KEY` 도 공개된 문자열이 기본�
 uv run alembic revision --autogenerate -m "설명"
 ```
 그리고 **생성된 마이그레이션을 눈으로 검토한다.** autogenerate가 항상 옳지는 않다 — 특히 컬럼 rename을 drop + add로 만들어 데이터를 날릴 수 있다.
+
+## autogenerate 는 매번 `groups.admin_code` 를 바꾸자고 한다
+
+무엇을 고쳤든 이 두 줄이 따라 나온다.
+
+```python
+batch_op.drop_index('ix_groups_admin_code')
+batch_op.create_unique_constraint(None, ['admin_code'])
+```
+
+**원인**: `c3f81a27b6d4` 가 유니크 *인덱스* 로 만들었는데 모델은 `unique=True`, 즉 유니크
+*제약* 이다. 둘은 SQLite 에서 동작이 같지만 autogenerate 는 다르다고 본다.
+
+**해결**: 그 hunk 를 **지우고 커밋한다.** 받아들이면 SQLite 배치 모드가 `groups` 테이블을
+통째로 다시 쓰는데, 얻는 것이 없다.
+
+> [!TIP] 무명 제약을 만들지 않는다
+> autogenerate 는 `create_foreign_key(None, ...)` 처럼 이름 없는 제약을 낸다. SQLite 배치
+> 모드에서 무명 제약은 **나중에 떼어낼 수 없어** downgrade 가 막힌다. 이름을 붙여준다
+> (`fk_transactions_account_id`).

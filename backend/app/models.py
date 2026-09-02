@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -41,6 +41,7 @@ class Group(Base):
     users: Mapped[list[User]] = relationship("User", back_populates="group")
     transactions: Mapped[list[Transaction]] = relationship("Transaction", back_populates="group")
     categories: Mapped[list[Category]] = relationship("Category", back_populates="group")
+    accounts: Mapped[list[Account]] = relationship("Account", back_populates="group")
 
 
 class User(Base):
@@ -56,6 +57,7 @@ class User(Base):
 
     group: Mapped[Group] = relationship("Group", back_populates="users")
     transactions: Mapped[list[Transaction]] = relationship("Transaction", back_populates="user")
+    accounts: Mapped[list[Account]] = relationship("Account", back_populates="user")
 
 
 class Category(Base):
@@ -89,8 +91,60 @@ class Transaction(Base):
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     date: Mapped[str] = mapped_column(String, nullable=False)  # YYYY-MM-DD
+    # 이 거래가 움직이는 계좌. NULL 이면 계좌와 무관한 보통의 거래다 (대부분이 그렇다).
+    account_id: Mapped[str | None] = mapped_column(String, ForeignKey("accounts.id"), nullable=True)
+    # amount 중 이자분. 나머지가 원금분이고, **잔액은 원금분만 움직인다.**
+    # 50만원을 갚았고 그중 이자가 10만원이면 amount=500000, interest_amount=100000 이다 —
+    # 거래를 원금/이자 두 줄로 쪼개지 않는다 (→ docs/accounts.md).
+    interest_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     group: Mapped[Group] = relationship("Group", back_populates="transactions")
     user: Mapped[User] = relationship("User", back_populates="transactions")
     category: Mapped[Category] = relationship("Category", back_populates="transactions")
+    account: Mapped[Account | None] = relationship("Account", back_populates="transactions")
+
+
+class Account(Base):
+    """대출·예금·적금 계좌.
+
+    **잔액 컬럼이 없다.** 잔액은 이 계좌에 연결된 거래에서 계산한다 — 손으로 갱신하는
+    숫자는 몇 달 뒤에 안 고치게 되고, 그러면 화면에 옛 잔액이 남는다 (→ docs/accounts.md).
+
+    소유는 개인(`user_id`)이지만 **열람은 그룹 전체**다. 거래와 같은 규칙이다:
+    읽기는 그룹, 쓰기는 본인.
+    """
+
+    __tablename__ = "accounts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=gen_uuid)
+    group_id: Mapped[str] = mapped_column(String, ForeignKey("groups.id"), nullable=False)
+    # 계좌 주인. 그룹이 아니라 구성원 한 명의 것이다.
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    # loan(대출) / deposit(예금) / installment(적금)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    # **kind 가 이 값의 뜻을 정한다** — 대출: 대출 원금 · 예금: 예치액 · 적금: 월 납입액.
+    # 셋으로 나누면 어느 행에서든 둘은 항상 비어 있다.
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    # 연이율(%). 만기 예상액·상환 예상액을 **계산해 보여주는 데만** 쓴다.
+    # 확정 값은 사람이 넣는다 — 우대금리·중도해지이율 때문에 공식과 늘 어긋난다.
+    rate: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    started_on: Mapped[str] = mapped_column(String, nullable=False)  # YYYY-MM-DD
+    matures_on: Mapped[str] = mapped_column(String, nullable=False)  # YYYY-MM-DD
+    # 대출만 채운다. equal_payment(원리금균등) / equal_principal(원금균등) / bullet(만기일시)
+    repay_method: Mapped[str | None] = mapped_column(String, nullable=True)
+    # active / matured(만기) / closed(중도해지·조기상환)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="active")
+    settled_on: Mapped[str | None] = mapped_column(String, nullable=True)
+    # 만기·해지 시 **사용자가 확정한** 수령액·상환액. 계산값이 아니다.
+    settled_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == "active"
+
+    group: Mapped[Group] = relationship("Group", back_populates="accounts")
+    user: Mapped[User] = relationship("User", back_populates="accounts")
+    transactions: Mapped[list[Transaction]] = relationship("Transaction", back_populates="account")
